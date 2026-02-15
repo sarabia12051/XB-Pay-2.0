@@ -24,6 +24,9 @@
         <h2>XB Pay 2.0 Auto</h2>
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
+
+        <label>Flat Spread Pay ($)</label>
+        <input type="number" id="spread_flat" value="0.00" step="0.01" placeholder="e.g. 15.00">
         
         <label>Piece 1 (Morning)</label>
         <input type="time" id="s1_start">
@@ -51,6 +54,7 @@
 
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
+            const flatSpreadPay = parseFloat(document.getElementById('spread_flat').value) || 0;
             const s1_s = getMinutes(document.getElementById('s1_start').value);
             const s1_e = getMinutes(document.getElementById('s1_end').value);
             const s2_s = getMinutes(document.getElementById('s2_start').value);
@@ -66,10 +70,10 @@
             let otHrs = Math.max(0, totalWorkHrs - 8);
             let straightHrs = totalWorkHrs - otHrs;
             
-            // ADJUSTED: Premium now starts after 10.75 hours (10:45)
-            let spreadPremiumHrs = Math.max(0, spreadHrs - 10.75);
+            // Logic: If spread is > 10.75, add the flat rate once.
+            let spreadBonus = (spreadHrs > 10.75) ? flatSpreadPay : 0;
             
-            let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPremiumHrs * rate * 0.5);
+            let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + spreadBonus;
             
             const res = document.getElementById('result');
             res.style.display = 'block';
@@ -78,7 +82,7 @@
                 `Total Work Hours: ${totalWorkHrs.toFixed(2)}<br>` +
                 `Overtime (1.5x): ${otHrs.toFixed(2)}<br>` +
                 `Spread: ${spreadHrs.toFixed(2)} hrs<br>` +
-                `Spread Premium (0.5x after 10h 45m): ${spreadPremiumHrs.toFixed(2)} hrs`;
+                `Spread Bonus Applied: $${spreadBonus.toFixed(2)}`;
         }
 
         function resetForm() {
