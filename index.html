@@ -54,34 +54,35 @@
             const s1_s = getMinutes(document.getElementById('s1_start').value);
             const s1_e = getMinutes(document.getElementById('s1_end').value);
             const s2_s = getMinutes(document.getElementById('s2_start').value);
-            const s2_e = getMinutes(document.getElementById('s2_end').value);
+            const s2_e = getMinutes(document.getElementById('s2_e') ? document.getElementById('s2_e').value : document.getElementById('s2_end').value);
             
-            // 1. Calculate actual work hours
+            // 1. Actual Work (Time behind the wheel)
             let p1 = (s1_s !== null && s1_e !== null) ? (s1_e - s1_s) : 0;
             let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
-            let totalWorkHrs = (p1 + p2) / 60;
+            let workHrs = (p1 + p2) / 60;
 
-            // 2. Calculate Spread (Total span of the day)
+            // 2. Overtime (Work over 8 hrs)
+            let otHrs = Math.max(0, workHrs - 8);
+            let straightHrs = workHrs - otHrs;
+
+            // 3. Spread (Total elapsed time)
             let times = [s1_s, s1_e, s2_s, s2_e].filter(t => t !== null);
-            let spreadHrs = (Math.max(...times) - Math.min(...times)) / 60;
+            let spreadHrs = times.length > 0 ? (Math.max(...times) - Math.min(...times)) / 60 : 0;
 
-            // 3. Math Logic
-            let otHrs = Math.max(0, totalWorkHrs - 8);
-            let straightHrs = totalWorkHrs - otHrs;
+            // 4. Spread Premium (Only the portion past 10:45)
+            let spreadPremiumHrs = Math.max(0, spreadHrs - 10.75);
             
-            // Spread Pay: Flat hourly rate for everything over 10:45 (10.75)
-            let spreadPayHrs = Math.max(0, spreadHrs - 10.75);
-            
-            let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
+            // Final Calculation
+            let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPremiumHrs * rate);
             
             const res = document.getElementById('result');
             res.style.display = 'block';
             document.getElementById('total').innerHTML = 'Total Pay: $' + totalPay.toFixed(2);
             document.getElementById('stats').innerHTML = 
-                `Work Hours: ${totalWorkHrs.toFixed(2)}<br>` +
-                `Overtime (1.5x): ${otHrs.toFixed(2)}<br>` +
+                `Work Time: ${workHrs.toFixed(2)} hrs<br>` +
+                `Overtime (1.5x): ${otHrs.toFixed(2)} hrs<br>` +
                 `Spread: ${spreadHrs.toFixed(2)} hrs<br>` +
-                `Spread Pay (Flat Rate): ${spreadPayHrs.toFixed(2)} hrs`;
+                `Spread Pay (past 10:45): ${spreadPremiumHrs.toFixed(2)} hrs`;
         }
 
         function resetForm() {
