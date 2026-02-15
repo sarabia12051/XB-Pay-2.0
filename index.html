@@ -11,7 +11,10 @@
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
         h2 { text-align: center; color: #00529b; margin-bottom: 20px; }
         label { font-weight: bold; display: block; margin-top: 15px; }
-        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .row { display: flex; align-items: center; margin-top: 10px; gap: 10px; }
+        .row label { margin-top: 0; font-size: 0.9em; font-weight: normal; }
+        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .reset-btn { background-color: #6c757d; margin-top: 10px; }
         .result { margin-top: 25px; padding: 15px; background-color: #e9f5ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
@@ -28,10 +31,18 @@
         <label>Piece 1 (Morning)</label>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
+        <div class="row">
+            <input type="checkbox" id="rept1">
+            <label for="rept1">Add 15m Report Time?</label>
+        </div>
         
         <label>Piece 2 (Afternoon)</label>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
+        <div class="row">
+            <input type="checkbox" id="rept2">
+            <label for="rept2">Add 15m Report Time?</label>
+        </div>
 
         <button onclick="calculate()">Calculate Daily Pay</button>
         <button class="reset-btn" onclick="resetForm()">Clear Times</button>
@@ -54,39 +65,43 @@
             const s1_s = getMinutes(document.getElementById('s1_start').value);
             const s1_e = getMinutes(document.getElementById('s1_end').value);
             const s2_s = getMinutes(document.getElementById('s2_start').value);
-            const s2_e = getMinutes(document.getElementById('s2_e') ? document.getElementById('s2_e').value : document.getElementById('s2_end').value);
+            const s2_e = getMinutes(document.getElementById('s2_end').value);
             
-            // 1. Actual Work (Time behind the wheel)
-            let p1 = (s1_s !== null && s1_e !== null) ? (s1_e - s1_s) : 0;
-            let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
+            // Calculate Report Time addition (15 mins if checked)
+            let r1 = document.getElementById('rept1').checked ? 15 : 0;
+            let r2 = document.getElementById('rept2').checked ? 15 : 0;
+            
+            // 1. Work Time (Driving + Checked Report Time)
+            let p1 = (s1_s !== null && s1_e !== null) ? (s1_e - s1_s + r1) : 0;
+            let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s + r2) : 0;
             let workHrs = (p1 + p2) / 60;
 
             // 2. Overtime (Work over 8 hrs)
             let otHrs = Math.max(0, workHrs - 8);
             let straightHrs = workHrs - otHrs;
 
-            // 3. Spread (Total elapsed time)
+            // 3. Spread (Span of the day)
             let times = [s1_s, s1_e, s2_s, s2_e].filter(t => t !== null);
             let spreadHrs = times.length > 0 ? (Math.max(...times) - Math.min(...times)) / 60 : 0;
 
-            // 4. Spread Premium (Only the portion past 10:45)
+            // 4. Spread Pay (past 10:45)
             let spreadPremiumHrs = Math.max(0, spreadHrs - 10.75);
             
-            // Final Calculation
             let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPremiumHrs * rate);
             
             const res = document.getElementById('result');
             res.style.display = 'block';
             document.getElementById('total').innerHTML = 'Total Pay: $' + totalPay.toFixed(2);
             document.getElementById('stats').innerHTML = 
-                `Work Time: ${workHrs.toFixed(2)} hrs<br>` +
+                `Total Paid Work: ${workHrs.toFixed(2)} hrs<br>` +
                 `Overtime (1.5x): ${otHrs.toFixed(2)} hrs<br>` +
-                `Spread: ${spreadHrs.toFixed(2)} hrs<br>` +
+                `Spread Span: ${spreadHrs.toFixed(2)} hrs<br>` +
                 `Spread Pay (past 10:45): ${spreadPremiumHrs.toFixed(2)} hrs`;
         }
 
         function resetForm() {
             document.querySelectorAll('input[type="time"]').forEach(input => input.value = '');
+            document.querySelectorAll('input[type="checkbox"]').forEach(box => box.checked = false);
             document.getElementById('result').style.display = 'none';
         }
     </script>
