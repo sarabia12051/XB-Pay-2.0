@@ -56,29 +56,32 @@
             const s2_s = getMinutes(document.getElementById('s2_start').value);
             const s2_e = getMinutes(document.getElementById('s2_end').value);
             
-            // Get all timestamps and find the start of the day and end of the day
+            // 1. Calculate actual work hours
+            let p1 = (s1_s !== null && s1_e !== null) ? (s1_e - s1_s) : 0;
+            let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
+            let totalWorkHrs = (p1 + p2) / 60;
+
+            // 2. Calculate Spread (Total span of the day)
             let times = [s1_s, s1_e, s2_s, s2_e].filter(t => t !== null);
-            if (times.length === 0) return;
+            let spreadHrs = (Math.max(...times) - Math.min(...times)) / 60;
 
-            let firstStart = Math.min(...times);
-            let lastEnd = Math.max(...times);
+            // 3. Math Logic
+            let otHrs = Math.max(0, totalWorkHrs - 8);
+            let straightHrs = totalWorkHrs - otHrs;
             
-            // Total Elapsed Hours (The "Spread")
-            let totalHours = (lastEnd - firstStart) / 60;
-
-            // Math Logic: 8 hours straight, anything over is 1.5x
-            let otHours = Math.max(0, totalHours - 8);
-            let straightHours = totalHours - otHours;
+            // Spread Pay: Flat hourly rate for everything over 10:45 (10.75)
+            let spreadPayHrs = Math.max(0, spreadHrs - 10.75);
             
-            let totalPay = (straightHours * rate) + (otHours * rate * 1.5);
+            let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
             
             const res = document.getElementById('result');
             res.style.display = 'block';
             document.getElementById('total').innerHTML = 'Total Pay: $' + totalPay.toFixed(2);
             document.getElementById('stats').innerHTML = 
-                `Total Elapsed Time: ${totalHours.toFixed(2)} hrs<br>` +
-                `Straight Time: ${straightHours.toFixed(2)} hrs<br>` +
-                `Overtime (1.5x): ${otHours.toFixed(2)} hrs`;
+                `Work Hours: ${totalWorkHrs.toFixed(2)}<br>` +
+                `Overtime (1.5x): ${otHrs.toFixed(2)}<br>` +
+                `Spread: ${spreadHrs.toFixed(2)} hrs<br>` +
+                `Spread Pay (Flat Rate): ${spreadPayHrs.toFixed(2)} hrs`;
         }
 
         function resetForm() {
