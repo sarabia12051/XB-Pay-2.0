@@ -1,0 +1,15 @@
+{
+  "name": "XB Pay 2.0 Auto",
+  "short_name": "XB Pay",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#00529b",
+  "theme_color": "#00529b"
+}
