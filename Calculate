@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTA Pay Tracker</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #eef2f3; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { color: #00529b; margin-top: 0; text-align: center; }
+        label { font-weight: bold; font-size: 0.9em; color: #555; display: block; margin-top: 15px; }
+        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 15px; background: #00529b; color: white; border: none; border-radius: 8px; font-weight: bold; margin-top: 20px; cursor: pointer; font-size: 16px; }
+        .result-box { margin-top: 25px; padding: 15px; background: #f0f7ff; border-radius: 8px; border-left: 5px solid #00529b; }
+        .detail { font-size: 0.85em; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>VTA Pay Calc</h2>
+        
+        <label>Your Step Rate ($)</label>
+        <input type="number" id="rate" value="42.20" step="0.01">
+        
+        <label>Actual Hours Worked</label>
+        <input type="number" id="hours" placeholder="Total hours on the clock">
+        
+        <label>Total Spread (Span of Day)</label>
+        <input type="number" id="spread" placeholder="Total hours from first sign-on to last sign-off">
+
+        <button onclick="calculate()">Calculate Daily Gross</button>
+
+        <div id="result" class="result-box" style="display:none;">
+            <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
+            <div id="breakdown" class="detail"></div>
+        </div>
+    </div>
+
+    <script>
+        function calculate() {
+            let rate = parseFloat(document.getElementById('rate').value);
+            let hours = parseFloat(document.getElementById('hours').value);
+            let spread = parseFloat(document.getElementById('spread').value);
+
+            if (!hours || !spread) { alert("Please fill in hours and spread!"); return; }
+
+            // 1. Straight Time Pay
+            let basePay = hours * rate;
+
+            // 2. Daily Overtime (Time and a half after 8.0 hours worked)
+            let otPay = hours > 8 ? (hours - 8) * (rate * 0.5) : 0;
+
+            // 3. Spread Premium (Contract typically pays 0.5x for time over 10.5 spread)
+            let spreadPay = spread > 10.5 ? (spread - 10.5) * (rate * 0.5) : 0;
+
+            let gross = basePay + otPay + spreadPay;
+
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('total').innerText = "Est. Gross: $" + gross.toFixed(2);
+            document.getElementById('breakdown').innerHTML = `
+                Base: $${basePay.toFixed(2)}<br>
+                Overtime: $${otPay.toFixed(2)} (at 1.5x)<br>
+                Spread: $${spreadPay.toFixed(2)} (Over 10.5h)
+            `;
+        }
+    </script>
+</body>
+</html>
