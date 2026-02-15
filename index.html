@@ -56,22 +56,19 @@
             const s2_s = getMinutes(document.getElementById('s2_start').value);
             const s2_e = getMinutes(document.getElementById('s2_end').value);
             
-            // Calculate work minutes
             let p1 = (s1_s !== null && s1_e !== null) ? (s1_e - s1_s) : 0;
             let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
             let totalWorkHrs = (p1 + p2) / 60;
 
-            // Calculate Spread (First start to last end)
             let times = [s1_s, s1_e, s2_s, s2_e].filter(t => t !== null);
             let spreadHrs = (Math.max(...times) - Math.min(...times)) / 60;
 
-            // Math Logic
             let otHrs = Math.max(0, totalWorkHrs - 8);
             let straightHrs = totalWorkHrs - otHrs;
-            let spreadPremiumHrs = Math.max(0, spreadHrs - 10);
             
-            // Total Pay Calculation
-            // Straight time + OT (1.5x) + Spread (0.5x premium)
+            // ADJUSTED: Premium now starts after 10.75 hours (10:45)
+            let spreadPremiumHrs = Math.max(0, spreadHrs - 10.75);
+            
             let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPremiumHrs * rate * 0.5);
             
             const res = document.getElementById('result');
@@ -81,7 +78,7 @@
                 `Total Work Hours: ${totalWorkHrs.toFixed(2)}<br>` +
                 `Overtime (1.5x): ${otHrs.toFixed(2)}<br>` +
                 `Spread: ${spreadHrs.toFixed(2)} hrs<br>` +
-                `Spread Premium (0.5x): ${spreadPremiumHrs.toFixed(2)} hrs`;
+                `Spread Premium (0.5x after 10h 45m): ${spreadPremiumHrs.toFixed(2)} hrs`;
         }
 
         function resetForm() {
