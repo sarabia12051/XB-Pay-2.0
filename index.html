@@ -24,19 +24,16 @@
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
         
-        <label>Piece 1</label>
+        <label>Piece 1 (Driving Only)</label>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
-        <div class="row">
-            <input type="checkbox" id="rept1" checked> <span>Add 15m Report Time (Piece 1)</span>
-        </div>
         
-        <label>Piece 2</label>
+        <label>Piece 2 (Driving Only)</label>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
-        <div class="row">
-            <input type="checkbox" id="rept2"> <span>Add 15m Report Time (Piece 2)</span>
-        </div>
+
+        <label>Report/Standby (Minutes)</label>
+        <input type="number" id="report_standby" value="0">
 
         <label>Travel Time (Minutes)</label>
         <div class="note">*(check div synopsis)*</div>
@@ -69,28 +66,29 @@
             const s1_e = getMinutes(document.getElementById('s1_end').value);
             const s2_s = getMinutes(document.getElementById('s2_start').value);
             const s2_e = getMinutes(document.getElementById('s2_end').value);
-            const r1 = document.getElementById('rept1').checked ? 15 : 0;
-            const r2 = document.getElementById('rept2').checked ? 15 : 0;
+            const standbyMins = parseFloat(document.getElementById('report_standby').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
             const isDayOff = document.getElementById('isDayOff').checked;
 
-            if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
+            if (s1_s === null || s1_e === null) return alert("Enter Piece 1 driving times");
 
-            // 1. STRICT PLATFORM TIME (Driving Only)
-            let p1_mins = s1_e - s1_s;
-            let p2_mins = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
-            let platformHrs = (p1_mins + p2_mins) / 60;
+            // 1. PLATFORM (Driving Only)
+            let p1 = s1_e - s1_s;
+            let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
+            let platformHrs = (p1 + p2) / 60;
 
-            // 2. BUCKETS (Report/Travel) - Separate from Platform
-            let bucketHrs = (r1 + r2 + travelMins) / 60;
+            // 2. BUCKETS (Report + Travel)
+            let bucketHrs = (standbyMins + travelMins) / 60;
 
-            // 3. SPREAD (From first report to last relief)
-            let spreadStart = s1_s - r1;
-            let lastEnd = (s2_s !== null && s2_e !== null) ? s2_e : s1_e;
+            // 3. SPREAD (From initial clock-in to final clock-out)
+            // For XB, spread starts when you first reported (e.g., 8:00 AM)
+            // To simplify, we assume the first piece start minus standby is the spread start
+            let spreadStart = s1_s - standbyMins;
+            let lastEnd = (s2_s !== null) ? s2_e : s1_e;
             let totalSpanHrs = (lastEnd - spreadStart) / 60;
             let spreadPayHrs = Math.max(0, totalSpanHrs - 10.75);
 
-            // 4. OVERTIME LOGIC (Platform Only)
+            // 4. PAYROLL BREAKDOWN
             let otHrs = Math.max(0, platformHrs - 8);
             let straightHrs = platformHrs - otHrs;
 
@@ -104,14 +102,13 @@
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = isDayOff ? 
-                `<strong>DAY OFF MODE: 1.5x All Day</strong>` :
+                `<strong>DAY OFF MODE: 1.5x Applied</strong>` :
                 `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Buckets: ${bucketHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
-                `Flat Rate Hours: ${bucketHrs.toFixed(2)}<br>` +
+                `Report/Travel Bucket: ${bucketHrs.toFixed(2)}<br>` +
                 `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
-                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
