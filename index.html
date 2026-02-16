@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay Auditor - Midnight Fix</title>
+    <title>VTA Pay Auditor</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
         input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
+        .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
@@ -18,7 +20,7 @@
 </head>
 <body>
     <div class="card">
-        <h2>XB Pay Auditor</h2>
+        <h2>VTA Pay Auditor</h2>
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
         
@@ -36,6 +38,12 @@
         <label>Travel Time (Minutes)</label>
         <div class="note">*(check div synopsis)*</div>
         <input type="number" id="travel" value="0">
+
+        <div class="day-off-row">
+            <div class="row">
+                <input type="checkbox" id="isDayOff"> <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? (1.5x All Day)</span>
+            </div>
+        </div>
 
         <button onclick="calculate()">Audit Pay Now</button>
 
@@ -60,46 +68,57 @@
             let s2_e = getMinutes(document.getElementById('s2_end').value);
             const standbyMins = parseFloat(document.getElementById('report_standby').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
+            const isDayOff = document.getElementById('isDayOff').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // MIDNIGHT LOGIC: If end is before start, it's the next day
+            // Midnight Logic
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
-                if (s2_s < s1_e) s2_s += 1440; // Piece 2 starts after Piece 1 ends
-                if (s2_e < s2_s) s2_e += 1440; // Piece 2 crosses midnight
+                if (s2_s < s1_e) s2_s += 1440; 
+                if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. PLATFORM
+            // 1. Platform
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
 
-            // 2. SPREAD LOGIC (Section .3: 10.5h @ 0.5x, 11h+ @ 1.0x)
+            // 2. Buckets
+            let bucketHrs = (standbyMins + travelMins) / 60;
+
+            // 3. Spread (10.5h/11h rule)
             let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - (s1_s - standbyMins) ) / 60;
-            
             let spreadPayHrs = 0;
             if (totalSpanHrs > 11) {
-                spreadPayHrs = 0.25 + (totalSpanHrs - 11); // 0.25 is 0.5x for the 30m gap
+                spreadPayHrs = 0.25 + (totalSpanHrs - 11);
             } else if (totalSpanHrs > 10.5) {
                 spreadPayHrs = (totalSpanHrs - 10.5) * 0.5;
             }
 
-            // 3. OVERTIME (Platform > 8)
+            // 4. Overtime (Platform Only)
             let otHrs = Math.max(0, platformHrs - 8);
             let straightHrs = platformHrs - otHrs;
 
-            // 4. BUCKETS (Report + Travel)
-            let bucketHrs = (standbyMins + travelMins) / 60;
-
-            let grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
+            // Final Calculation
+            let grossPay;
+            if (isDayOff) {
+                // Day Off = All time @ 1.5x
+                grossPay = (platformHrs + bucketHrs + spreadPayHrs) * (rate * 1.5);
+            } else {
+                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
+            }
 
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
-            document.getElementById('stats').innerHTML = `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
+            document.getElementById('stats').innerHTML = isDayOff ? 
+                `<strong>DAY OFF MODE: 1.5x RATE APPLIED</strong>` :
+                `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
+            
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
-                `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
+                `Buckets: ${bucketHrs.toFixed(2)}<br>` +
+                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
