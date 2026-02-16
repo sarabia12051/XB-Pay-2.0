@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VTA Extra Board Pay Auditor</title>
+    <title>XB Pay Auditor - Fixed</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -14,7 +14,7 @@
         .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
-        .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; }
+        .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -27,7 +27,7 @@
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         <div class="row">
-            <input type="checkbox" id="rept1" checked> <label>Add 15m Report Time</label>
+            <input type="checkbox" id="rept1" checked> <span>Add 15m Report Time</span>
         </div>
         
         <label>Piece 2 (On to Relief)</label>
@@ -36,7 +36,7 @@
 
         <div class="day-off-row">
             <div class="row">
-                <input type="checkbox" id="isDayOff"> <label style="color: #c53030;">WORKING DAY OFF? (1.5x All Day)</label>
+                <input type="checkbox" id="isDayOff"> <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? (1.5x All Day)</span>
             </div>
         </div>
 
@@ -66,36 +66,43 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter at least Piece 1 times");
 
-            // 1. Work Calculations
-            let workMin = (s1_e - s1_s + r1) + (s2_s !== null ? (s2_e - s2_s) : 0);
-            let workHrs = workMin / 60;
-            let otHrs = Math.max(0, workHrs - 8);
-            let straightHrs = workHrs - otHrs;
+            // 1. WORK TIME (Including Report)
+            let piece1_work = (s1_e - s1_s) + r1;
+            let piece2_work = (s2_s !== null) ? (s2_e - s2_s) : 0;
+            let totalWorkHrs = (piece1_work + piece2_work) / 60;
 
-            // 2. Spread Calculations (Always starts at Report time)
+            // 2. SPREAD TIME (Starts at Report time)
             let spreadStart = s1_s - r1;
             let lastEnd = (s2_s !== null) ? s2_e : s1_e;
-            let spreadHrs = (lastEnd - spreadStart) / 60;
-            let spreadPayHrs = Math.max(0, spreadHrs - 10.75);
+            let totalSpanHrs = (lastEnd - spreadStart) / 60;
+            let spreadPayHrs = Math.max(0, totalSpanHrs - 10.75);
 
-            // 3. Payroll Logic
-            let totalPay;
+            // 3. PAYROLL BREAKDOWN
+            let otHrs = Math.max(0, totalWorkHrs - 8);
+            let straightHrs = totalWorkHrs - otHrs;
+
+            let grossPay;
             if (isDayOff) {
-                // DAY OFF RULE: 1.5x for everything
-                totalPay = (workHrs + spreadPayHrs) * (rate * 1.5);
+                // Entire day at 1.5x
+                grossPay = (totalWorkHrs + spreadPayHrs) * (rate * 1.5);
             } else {
-                // REGULAR RULE: Standard OT and Spread
-                totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
+                // Standard VTA: Straight + (OT * 1.5) + Spread
+                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
             }
 
+            // DISPLAY
             document.getElementById('result').style.display = 'block';
-            document.getElementById('total').innerText = `Gross Pay: $${totalPay.toFixed(2)}`;
+            document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
+            
             document.getElementById('stats').innerHTML = isDayOff ? 
-                `<strong>DAY OFF MODE ENABLED</strong><br>Total Hours (at 1.5x): ${(workHrs + spreadPayHrs).toFixed(2)}` :
-                `Straight: ${straightHrs.toFixed(2)} hrs<br>OT: ${otHrs.toFixed(2)} hrs<br>Spread: ${spreadPayHrs.toFixed(2)} hrs`;
+                `<strong>DAY OFF MODE: 1.5x Rate Applied</strong>` :
+                `Straight Time: ${straightHrs.toFixed(2)} hrs<br>OT (1.5x): ${otHrs.toFixed(2)} hrs<br>Spread Pay: ${spreadPayHrs.toFixed(2)} hrs`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work: ${workHrs.toFixed(2)}<br>Total Span: ${spreadHrs.toFixed(2)}<br>Eq. Pay Hours: ${(totalPay / rate).toFixed(2)}`;
+                `Total Work (incl. report): ${totalWorkHrs.toFixed(2)}<br>` +
+                `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
+                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
+                `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
 </body>
