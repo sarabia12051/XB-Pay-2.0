@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay Auditor - Final Labels</title>
+    <title>XB Pay Auditor - Clean Labels</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -24,14 +24,14 @@
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
         
-        <label>Piece 1 (Report to Relief)</label>
+        <label>Piece 1</label>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         <div class="row">
             <input type="checkbox" id="rept1" checked> <span>Add 15m Report Time (Piece 1)</span>
         </div>
         
-        <label>Piece 2 (On to Relief)</label>
+        <label>Piece 2</label>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
         <div class="row">
@@ -76,10 +76,14 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter at least Piece 1 times");
 
+            // PLATFORM TIME (Used for Overtime calculation)
             let platformMin = (s1_e - s1_s) + (s2_s !== null ? (s2_e - s2_s) : 0);
             let platformHrs = platformMin / 60;
+            
+            // FLAT BUCKETS (Calculated at straight rate only)
             let flatHrs = (r1 + r2 + travelMins) / 60;
 
+            // SPREAD calculation
             let spreadStart = s1_s - r1;
             let lastEnd = (s2_s !== null) ? s2_e : s1_e;
             let totalSpanHrs = (lastEnd - spreadStart) / 60;
@@ -97,6 +101,7 @@
 
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
+            
             document.getElementById('stats').innerHTML = isDayOff ? 
                 `<strong>DAY OFF MODE: 1.5x Rate Applied</strong>` :
                 `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Buckets: ${flatHrs.toFixed(2)}`;
