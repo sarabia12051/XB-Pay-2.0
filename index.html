@@ -15,6 +15,7 @@
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
+        .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
         .note { font-style: italic; font-size: 0.8em; color: #666; margin-top: 2px; }
     </style>
 </head>
@@ -60,6 +61,10 @@
                 <span id="audit-details"></span>
             </div>
         </div>
+
+        <div class="disclaimer">
+            Unofficial tool. Consult your timekeeper for accuracy.
+        </div>
     </div>
 
     <script>
@@ -77,30 +82,37 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
+            // Midnight crossover logic
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
+            // 1. Platform Hours
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
+
+            // 2. Report/Travel Buckets
             let bucketHrs = (standbyMins + travelMins) / 60;
 
+            // 3. Contract Spread (Section .3: 10.5h and 11h thresholds)
             let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - (s1_s - standbyMins) ) / 60;
             let spreadPayHrs = 0;
             if (totalSpanHrs > 11) {
-                spreadPayHrs = 0.25 + (totalSpanHrs - 11);
+                spreadPayHrs = 0.25 + (totalSpanHrs - 11); // 0.25 accounts for the 0.5x gap between 10.5-11
             } else if (totalSpanHrs > 10.5) {
                 spreadPayHrs = (totalSpanHrs - 10.5) * 0.5;
             }
 
+            // 4. Overtime Calculation (Standard daily OT after 8 platform hours)
             let otHrs = Math.max(0, platformHrs - 8);
             let straightHrs = platformHrs - otHrs;
 
             let grossPay;
             if (isDayOff) {
+                // REST DAY rule: All time paid at 1.5x
                 grossPay = (platformHrs + bucketHrs + spreadPayHrs) * (rate * 1.5);
             } else {
                 grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
@@ -109,13 +121,13 @@
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = isDayOff ? 
-                `<strong>DAY OFF MODE: 1.5x Multiplier</strong>` :
+                `<strong>DAY OFF MODE: 1.5x Multiplier Applied</strong>` :
                 `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
-                `Buckets: ${bucketHrs.toFixed(2)}<br>` +
-                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
+                `Buckets (Report/Travel): ${bucketHrs.toFixed(2)}<br>` +
+                `Premium-Spread: ${spreadPayHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
