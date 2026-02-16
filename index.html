@@ -10,7 +10,7 @@
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
         input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
+        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.85em; }
         .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
@@ -41,7 +41,12 @@
 
         <div class="day-off-row">
             <div class="row">
-                <input type="checkbox" id="isDayOff"> <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? (1.5x All Day)</span>
+                <input type="checkbox" id="isDayOff"> 
+                <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? 
+                    <span style="font-weight: normal; font-size: 0.9em; display: block; margin-top: 3px;">
+                        (Note: Saturday and Sunday are considered overtime, not weekdays worked as days off)
+                    </span>
+                </span>
             </div>
         </div>
 
@@ -72,22 +77,17 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // Midnight Logic
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. Platform
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
-
-            // 2. Buckets
             let bucketHrs = (standbyMins + travelMins) / 60;
 
-            // 3. Spread (10.5h/11h rule)
             let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - (s1_s - standbyMins) ) / 60;
             let spreadPayHrs = 0;
             if (totalSpanHrs > 11) {
@@ -96,14 +96,11 @@
                 spreadPayHrs = (totalSpanHrs - 10.5) * 0.5;
             }
 
-            // 4. Overtime (Platform Only)
             let otHrs = Math.max(0, platformHrs - 8);
             let straightHrs = platformHrs - otHrs;
 
-            // Final Calculation
             let grossPay;
             if (isDayOff) {
-                // Day Off = All time @ 1.5x
                 grossPay = (platformHrs + bucketHrs + spreadPayHrs) * (rate * 1.5);
             } else {
                 grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
@@ -112,7 +109,7 @@
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = isDayOff ? 
-                `<strong>DAY OFF MODE: 1.5x RATE APPLIED</strong>` :
+                `<strong>DAY OFF MODE: 1.5x Multiplier</strong>` :
                 `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
