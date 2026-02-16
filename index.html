@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay Auditor - Fixed</title>
+    <title>XB Pay Auditor - Full Version</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
         input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        .row { display: flex; align-items: center; margin-top: 12px; gap: 10px; }
+        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
         .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
@@ -27,12 +27,15 @@
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         <div class="row">
-            <input type="checkbox" id="rept1" checked> <span>Add 15m Report Time</span>
+            <input type="checkbox" id="rept1" checked> <span>Add 15m Report Time (Piece 1)</span>
         </div>
         
         <label>Piece 2 (On to Relief)</label>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
+        <div class="row">
+            <input type="checkbox" id="rept2"> <span>Add 15m Report Time (Piece 2)</span>
+        </div>
 
         <div class="day-off-row">
             <div class="row">
@@ -62,16 +65,17 @@
             const s2_s = getMinutes(document.getElementById('s2_start').value);
             const s2_e = getMinutes(document.getElementById('s2_end').value);
             const r1 = document.getElementById('rept1').checked ? 15 : 0;
+            const r2 = document.getElementById('rept2').checked ? 15 : 0;
             const isDayOff = document.getElementById('isDayOff').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter at least Piece 1 times");
 
-            // 1. WORK TIME (Including Report)
+            // 1. WORK TIME (Including both potential reports)
             let piece1_work = (s1_e - s1_s) + r1;
-            let piece2_work = (s2_s !== null) ? (s2_e - s2_s) : 0;
+            let piece2_work = (s2_s !== null) ? ((s2_e - s2_s) + r2) : 0;
             let totalWorkHrs = (piece1_work + piece2_work) / 60;
 
-            // 2. SPREAD TIME (Starts at Report time)
+            // 2. SPREAD TIME (Always starts from the Piece 1 Report)
             let spreadStart = s1_s - r1;
             let lastEnd = (s2_s !== null) ? s2_e : s1_e;
             let totalSpanHrs = (lastEnd - spreadStart) / 60;
@@ -83,25 +87,21 @@
 
             let grossPay;
             if (isDayOff) {
-                // Entire day at 1.5x
                 grossPay = (totalWorkHrs + spreadPayHrs) * (rate * 1.5);
             } else {
-                // Standard VTA: Straight + (OT * 1.5) + Spread
                 grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
             }
 
-            // DISPLAY
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
             document.getElementById('stats').innerHTML = isDayOff ? 
                 `<strong>DAY OFF MODE: 1.5x Rate Applied</strong>` :
-                `Straight Time: ${straightHrs.toFixed(2)} hrs<br>OT (1.5x): ${otHrs.toFixed(2)} hrs<br>Spread Pay: ${spreadPayHrs.toFixed(2)} hrs`;
+                `Straight: ${straightHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work (incl. report): ${totalWorkHrs.toFixed(2)}<br>` +
+                `Total Work: ${totalWorkHrs.toFixed(2)}<br>` +
                 `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
-                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
