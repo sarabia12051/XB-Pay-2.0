@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay Auditor - Clean Labels</title>
+    <title>XB Pay Auditor - Platform Fix</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -74,41 +74,42 @@
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
             const isDayOff = document.getElementById('isDayOff').checked;
 
-            if (s1_s === null || s1_e === null) return alert("Enter at least Piece 1 times");
+            if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // PLATFORM TIME (Used for Overtime calculation)
-            let platformMin = (s1_e - s1_s) + (s2_s !== null ? (s2_e - s2_s) : 0);
-            let platformHrs = platformMin / 60;
-            
-            // FLAT BUCKETS (Calculated at straight rate only)
-            let flatHrs = (r1 + r2 + travelMins) / 60;
+            // 1. STRICT PLATFORM TIME (Driving Only)
+            let p1_mins = s1_e - s1_s;
+            let p2_mins = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
+            let platformHrs = (p1_mins + p2_mins) / 60;
 
-            // SPREAD calculation
+            // 2. BUCKETS (Report/Travel) - Separate from Platform
+            let bucketHrs = (r1 + r2 + travelMins) / 60;
+
+            // 3. SPREAD (From first report to last relief)
             let spreadStart = s1_s - r1;
-            let lastEnd = (s2_s !== null) ? s2_e : s1_e;
+            let lastEnd = (s2_s !== null && s2_e !== null) ? s2_e : s1_e;
             let totalSpanHrs = (lastEnd - spreadStart) / 60;
             let spreadPayHrs = Math.max(0, totalSpanHrs - 10.75);
 
+            // 4. OVERTIME LOGIC (Platform Only)
             let otHrs = Math.max(0, platformHrs - 8);
             let straightHrs = platformHrs - otHrs;
 
             let grossPay;
             if (isDayOff) {
-                grossPay = (platformHrs + flatHrs + spreadPayHrs) * (rate * 1.5);
+                grossPay = (platformHrs + bucketHrs + spreadPayHrs) * (rate * 1.5);
             } else {
-                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (flatHrs * rate) + (spreadPayHrs * rate);
+                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
             }
 
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
-            
             document.getElementById('stats').innerHTML = isDayOff ? 
-                `<strong>DAY OFF MODE: 1.5x Rate Applied</strong>` :
-                `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Buckets: ${flatHrs.toFixed(2)}`;
+                `<strong>DAY OFF MODE: 1.5x All Day</strong>` :
+                `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Buckets: ${bucketHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
-                `Flat Rate Hours: ${flatHrs.toFixed(2)}<br>` +
+                `Flat Rate Hours: ${bucketHrs.toFixed(2)}<br>` +
                 `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
                 `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
