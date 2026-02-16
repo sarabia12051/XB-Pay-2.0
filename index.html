@@ -3,46 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay 2.0 VTA Final</title>
+    <title>VTA Extra Board Pay Auditor</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f0f2f5; color: #1c1e21; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        h2 { text-align: center; color: #00529b; margin-bottom: 20px; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
+        h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
-        input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        .row { display: flex; align-items: center; margin-top: 10px; gap: 10px; }
-        input[type="checkbox"] { width: 22px; height: 22px; }
+        input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+        .row { display: flex; align-items: center; margin-top: 12px; gap: 10px; }
+        .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-        .result { margin-top: 25px; padding: 15px; background-color: #e9f5ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
-        .audit-section { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; }
+        .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
+        .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>XB Pay 2.0 VTA</h2>
+        <h2>XB Pay Auditor</h2>
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
         
-        <label>Piece 1</label>
+        <label>Piece 1 (Report to Relief)</label>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         <div class="row">
-            <input type="checkbox" id="rept1"> <label>Add 15m Report (Pay & Spread)</label>
+            <input type="checkbox" id="rept1" checked> <label>Add 15m Report Time</label>
         </div>
         
-        <label>Piece 2</label>
+        <label>Piece 2 (On to Relief)</label>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
-        <div class="row">
-            <input type="checkbox" id="rept2"> <label>Add 15m Report (Pay Only)</label>
+
+        <div class="day-off-row">
+            <div class="row">
+                <input type="checkbox" id="isDayOff"> <label style="color: #c53030;">WORKING DAY OFF? (1.5x All Day)</label>
+            </div>
         </div>
 
-        <button onclick="calculate()">Calculate Gross Pay</button>
+        <button onclick="calculate()">Audit Pay Now</button>
 
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
-            <div id="stats" style="font-size: 0.9em; margin-top: 10px; line-height: 1.5;"></div>
-            <div class="audit-section">
+            <div id="stats" style="font-size: 0.9em; margin-top: 8px; line-height: 1.6;"></div>
+            <div class="audit">
                 <strong>TIMEKEEPER AUDIT:</strong><br>
                 <span id="audit-details"></span>
             </div>
@@ -50,11 +53,7 @@
     </div>
 
     <script>
-        function getMinutes(timeStr) {
-            if (!timeStr) return null;
-            const [h, m] = timeStr.split(':').map(Number);
-            return h * 60 + m;
-        }
+        function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
@@ -63,33 +62,40 @@
             const s2_s = getMinutes(document.getElementById('s2_start').value);
             const s2_e = getMinutes(document.getElementById('s2_end').value);
             const r1 = document.getElementById('rept1').checked ? 15 : 0;
-            const r2 = document.getElementById('rept2').checked ? 15 : 0;
-            
-            // 1. Work & OT (The Work Bucket)
-            let workHrs = ((s1_e - s1_s + r1) + (s2_e - s2_s + r2)) / 60;
+            const isDayOff = document.getElementById('isDayOff').checked;
+
+            if (s1_s === null || s1_e === null) return alert("Enter at least Piece 1 times");
+
+            // 1. Work Calculations
+            let workMin = (s1_e - s1_s + r1) + (s2_s !== null ? (s2_e - s2_s) : 0);
+            let workHrs = workMin / 60;
             let otHrs = Math.max(0, workHrs - 8);
             let straightHrs = workHrs - otHrs;
 
-            // 2. Spread (The Clock Bucket - starts 15m early if R1 checked)
-            let spreadStart = r1 ? (s1_s - 15) : s1_s;
-            let spreadHrs = (s2_e - spreadStart) / 60;
+            // 2. Spread Calculations (Always starts at Report time)
+            let spreadStart = s1_s - r1;
+            let lastEnd = (s2_s !== null) ? s2_e : s1_e;
+            let spreadHrs = (lastEnd - spreadStart) / 60;
             let spreadPayHrs = Math.max(0, spreadHrs - 10.75);
-            
-            // 3. THE FIX: No subtraction of OT. Pay everything.
-            let totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
-            
+
+            // 3. Payroll Logic
+            let totalPay;
+            if (isDayOff) {
+                // DAY OFF RULE: 1.5x for everything
+                totalPay = (workHrs + spreadPayHrs) * (rate * 1.5);
+            } else {
+                // REGULAR RULE: Standard OT and Spread
+                totalPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
+            }
+
             document.getElementById('result').style.display = 'block';
-            document.getElementById('total').innerHTML = 'Total Pay: $' + totalPay.toFixed(2);
-            document.getElementById('stats').innerHTML = 
-                `Straight Time: ${straightHrs.toFixed(2)} hrs<br>` +
-                `OT (1.5x): ${otHrs.toFixed(2)} hrs<br>` +
-                `Spread Pay: ${spreadPayHrs.toFixed(2)} hrs`;
+            document.getElementById('total').innerText = `Gross Pay: $${totalPay.toFixed(2)}`;
+            document.getElementById('stats').innerHTML = isDayOff ? 
+                `<strong>DAY OFF MODE ENABLED</strong><br>Total Hours (at 1.5x): ${(workHrs + spreadPayHrs).toFixed(2)}` :
+                `Straight: ${straightHrs.toFixed(2)} hrs<br>OT: ${otHrs.toFixed(2)} hrs<br>Spread: ${spreadPayHrs.toFixed(2)} hrs`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work: ${workHrs.toFixed(2)}<br>` +
-                `Total Span: ${spreadHrs.toFixed(2)}<br>` +
-                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
-                `Equivalent Pay Hours: ${(totalPay / rate).toFixed(2)}`;
+                `Total Work: ${workHrs.toFixed(2)}<br>Total Span: ${spreadHrs.toFixed(2)}<br>Eq. Pay Hours: ${(totalPay / rate).toFixed(2)}`;
         }
     </script>
 </body>
