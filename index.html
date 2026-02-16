@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay Auditor - Contract Verified</title>
+    <title>XB Pay Auditor - Midnight Fix</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -54,27 +54,33 @@
 
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
-            const s1_s = getMinutes(document.getElementById('s1_start').value);
-            const s1_e = getMinutes(document.getElementById('s1_end').value);
-            const s2_s = getMinutes(document.getElementById('s2_start').value);
-            const s2_e = getMinutes(document.getElementById('s2_end').value);
+            let s1_s = getMinutes(document.getElementById('s1_start').value);
+            let s1_e = getMinutes(document.getElementById('s1_end').value);
+            let s2_s = getMinutes(document.getElementById('s2_start').value);
+            let s2_e = getMinutes(document.getElementById('s2_end').value);
             const standbyMins = parseFloat(document.getElementById('report_standby').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
+
+            // MIDNIGHT LOGIC: If end is before start, it's the next day
+            if (s1_e < s1_s) s1_e += 1440; 
+            if (s2_s !== null && s2_e !== null) {
+                if (s2_s < s1_e) s2_s += 1440; // Piece 2 starts after Piece 1 ends
+                if (s2_e < s2_s) s2_e += 1440; // Piece 2 crosses midnight
+            }
 
             // 1. PLATFORM
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
 
-            // 2. SPREAD LOGIC (Section .3 of Contract)
-            // Elapsed time excluding report/travel per contract
-            let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - s1_s ) / 60;
+            // 2. SPREAD LOGIC (Section .3: 10.5h @ 0.5x, 11h+ @ 1.0x)
+            let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - (s1_s - standbyMins) ) / 60;
             
             let spreadPayHrs = 0;
             if (totalSpanHrs > 11) {
-                spreadPayHrs = (0.5 * 0.5) + (totalSpanHrs - 11); // 0.5x for the first 30m gap + 1.0x after
+                spreadPayHrs = 0.25 + (totalSpanHrs - 11); // 0.25 is 0.5x for the 30m gap
             } else if (totalSpanHrs > 10.5) {
                 spreadPayHrs = (totalSpanHrs - 10.5) * 0.5;
             }
@@ -83,7 +89,7 @@
             let otHrs = Math.max(0, platformHrs - 8);
             let straightHrs = platformHrs - otHrs;
 
-            // 4. BUCKETS (Straight Time)
+            // 4. BUCKETS (Report + Travel)
             let bucketHrs = (standbyMins + travelMins) / 60;
 
             let grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
@@ -92,7 +98,7 @@
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
             document.getElementById('audit-details').innerHTML = 
-                `Contract Spread Rule Applied<br>` +
+                `Platform Time: ${platformHrs.toFixed(2)}<br>` +
                 `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
