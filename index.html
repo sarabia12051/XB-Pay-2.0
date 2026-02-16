@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XB Pay Auditor - Full Version</title>
+    <title>XB Pay Auditor - Bucket Version</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -15,6 +15,7 @@
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
+        .note { font-style: italic; font-size: 0.8em; color: #666; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -24,6 +25,7 @@
         <input type="number" id="rate" value="45.00" step="0.01">
         
         <label>Piece 1 (Report to Relief)</label>
+        <div class="note">*(check div synopsis)*</div>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         <div class="row">
@@ -31,11 +33,16 @@
         </div>
         
         <label>Piece 2 (On to Relief)</label>
+        <div class="note">*(check div synopsis)*</div>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
         <div class="row">
             <input type="checkbox" id="rept2"> <span>Add 15m Report Time (Piece 2)</span>
         </div>
+
+        <label>Travel Time (Minutes)</label>
+        <div class="note">*(check div synopsis)*</div>
+        <input type="number" id="travel" value="0">
 
         <div class="day-off-row">
             <div class="row">
@@ -66,30 +73,36 @@
             const s2_e = getMinutes(document.getElementById('s2_end').value);
             const r1 = document.getElementById('rept1').checked ? 15 : 0;
             const r2 = document.getElementById('rept2').checked ? 15 : 0;
+            const travelMins = parseFloat(document.getElementById('travel').value) || 0;
             const isDayOff = document.getElementById('isDayOff').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter at least Piece 1 times");
 
-            // 1. WORK TIME (Including both potential reports)
-            let piece1_work = (s1_e - s1_s) + r1;
-            let piece2_work = (s2_s !== null) ? ((s2_e - s2_s) + r2) : 0;
-            let totalWorkHrs = (piece1_work + piece2_work) / 60;
+            // 1. PLATFORM TIME (Used for Overtime)
+            let platformMin = (s1_e - s1_s) + (s2_s !== null ? (s2_e - s2_s) : 0);
+            let platformHrs = platformMin / 60;
 
-            // 2. SPREAD TIME (Always starts from the Piece 1 Report)
+            // 2. FLAT BUCKETS (Report & Travel)
+            let flatMins = r1 + r2 + travelMins;
+            let flatHrs = flatMins / 60;
+
+            // 3. SPREAD TIME (Total Span from first report to last relief)
             let spreadStart = s1_s - r1;
             let lastEnd = (s2_s !== null) ? s2_e : s1_e;
             let totalSpanHrs = (lastEnd - spreadStart) / 60;
             let spreadPayHrs = Math.max(0, totalSpanHrs - 10.75);
 
-            // 3. PAYROLL BREAKDOWN
-            let otHrs = Math.max(0, totalWorkHrs - 8);
-            let straightHrs = totalWorkHrs - otHrs;
+            // 4. PAYROLL BREAKDOWN
+            let otHrs = Math.max(0, platformHrs - 8);
+            let straightHrs = platformHrs - otHrs;
 
             let grossPay;
             if (isDayOff) {
-                grossPay = (totalWorkHrs + spreadPayHrs) * (rate * 1.5);
+                // Entire day (Work + Travel + Reports + Spread) at 1.5x
+                grossPay = (platformHrs + flatHrs + spreadPayHrs) * (rate * 1.5);
             } else {
-                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (spreadPayHrs * rate);
+                // Regular: (Straight Platform + OT) + (Flat Buckets @ Straight) + Spread
+                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (flatHrs * rate) + (spreadPayHrs * rate);
             }
 
             document.getElementById('result').style.display = 'block';
@@ -97,11 +110,13 @@
             
             document.getElementById('stats').innerHTML = isDayOff ? 
                 `<strong>DAY OFF MODE: 1.5x Rate Applied</strong>` :
-                `Straight: ${straightHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
+                `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Buckets (Report/Travel): ${flatHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work: ${totalWorkHrs.toFixed(2)}<br>` +
+                `Platform Time: ${platformHrs.toFixed(2)}<br>` +
+                `Flat Rate Hours: ${flatHrs.toFixed(2)}<br>` +
                 `Total Span: ${totalSpanHrs.toFixed(2)}<br>` +
+                `Spread Pay: ${spreadPayHrs.toFixed(2)}<br>` +
                 `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
