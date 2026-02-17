@@ -48,6 +48,7 @@
         <input type="number" id="report_standby" value="0">
 
         <label>Travel Time (Minutes)</label>
+        <div class="note">*(check div synopsis)*</div>
         <input type="number" id="travel" value="0">
 
         <div class="day-off-row">
@@ -92,64 +93,47 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // Handle overnight shifts
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. CALCULATE TOTAL WORK TIME (ST)
-            // Lisa's way: Platform + Report + Travel = Total Work Hours
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
-            let totalWorkHrs = (p1 + p2 + standbyMins + travelMins) / 60;
+            let platformHrs = (p1 + p2) / 60;
 
-            // 2. CALCULATE SPREAD PREMIUM (0.5 bonus)
-            // New Contract Rule: Spread starts at 10:30 (10.5 hrs)
-            let firstReport = s1_s - standbyMins;
-            let lastEnd = (s2_s !== null ? s2_e : s1_e);
-            let totalSpanHrs = (lastEnd - firstReport) / 60;
-            
-            let spreadPremiumHrs = 0;
-            if (totalSpanHrs > 10.5) {
-                // We multiply by 0.5 because the base hour is already inside 'totalWorkHrs'
-                spreadPremiumHrs = (totalSpanHrs - 10.5) * 0.5;
+            let bucketHrs = (standbyMins + travelMins) / 60;
+
+            let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - (s1_s - standbyMins) ) / 60;
+            let spreadPayHrs = 0;
+            if (totalSpanHrs > 11) {
+                spreadPayHrs = 0.25 + (totalSpanHrs - 11);
+            } else if (totalSpanHrs > 10.5) {
+                spreadPayHrs = (totalSpanHrs - 10.5) * 0.5;
             }
 
-            // 3. CALCULATE OVERTIME PREMIUM (0.5 bonus)
-            // Anything over 8 hours of total work gets the 0.5 bonus
-            let otPremiumHrs = 0;
-            if (totalWorkHrs > 8) {
-                otPremiumHrs = (totalWorkHrs - 8) * 0.5;
-            }
+            let otHrs = Math.max(0, platformHrs - 8);
+            let straightHrs = platformHrs - otHrs;
 
-            // 4. FINAL PAY CALCULATION
             let grossPay;
-            let equivalentPayHours;
-
             if (isDayOff) {
-                // Working Day Off is 1.5x for all work + spread bonus
-                equivalentPayHours = (totalWorkHrs * 1.5) + spreadPremiumHrs;
+                grossPay = (platformHrs + bucketHrs + spreadPayHrs) * (rate * 1.5);
             } else {
-                // Normal Day: Base Work + OT Bonus + Spread Bonus
-                equivalentPayHours = totalWorkHrs + otPremiumHrs + spreadPremiumHrs;
+                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
             }
-            
-            grossPay = equivalentPayHours * rate;
 
-            // DISPLAY RESULTS
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = isDayOff ? 
                 `<strong>DAY OFF MODE: 1.5x Multiplier Applied</strong>` :
-                `Work: ${totalWorkHrs.toFixed(2)} | OT Prem: ${otPremiumHrs.toFixed(2)} | Spread Prem: ${spreadPremiumHrs.toFixed(2)}`;
+                `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work Time: ${totalWorkHrs.toFixed(2)}<br>` +
-                `Overtime Bonus (0.5): ${otPremiumHrs.toFixed(2)}<br>` +
-                `Spread Bonus (0.5): ${spreadPremiumHrs.toFixed(2)}<br>` +
-                `<strong>Total Pay Hours: ${equivalentPayHours.toFixed(2)}</strong>`;
+                `Platform Time: ${platformHrs.toFixed(2)}<br>` +
+                `Buckets (Report/Travel): ${bucketHrs.toFixed(2)}<br>` +
+                `Premium-Spread: ${spreadPayHrs.toFixed(2)}<br>` +
+                `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
         }
     </script>
 </body>
