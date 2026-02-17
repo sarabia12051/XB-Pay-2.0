@@ -99,41 +99,51 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
+            // 1. RAW HOURS FOR AUDIT DISPLAY
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
-
             let bucketHrs = (standbyMins + travelMins) / 60;
 
+            // 2. SPREAD LOGIC (10:30 Rule)
             let totalSpanHrs = ( (s2_s !== null ? s2_e : s1_e) - (s1_s - standbyMins) ) / 60;
-            let spreadPayHrs = 0;
-            if (totalSpanHrs > 11) {
-                spreadPayHrs = 0.25 + (totalSpanHrs - 11);
-            } else if (totalSpanHrs > 10.5) {
-                spreadPayHrs = (totalSpanHrs - 10.5) * 0.5;
+            let spreadPremiumHrs = 0;
+            if (totalSpanHrs > 10.5) {
+                // Total hours in the spread zone
+                spreadPremiumHrs = totalSpanHrs - 10.5;
             }
 
-            let otHrs = Math.max(0, platformHrs - 8);
-            let straightHrs = platformHrs - otHrs;
+            // 3. OVERTIME LOGIC
+            // Note: Lisa counts Report/Travel toward the 8-hour limit
+            let workTowardOT = platformHrs + bucketHrs;
+            let otActualHrs = Math.max(0, workTowardOT - 8);
+            let straightHrs = workTowardOT - otActualHrs;
 
+            // 4. CASH CALCULATION (THE "LISA" FIX)
             let grossPay;
             if (isDayOff) {
-                grossPay = (platformHrs + bucketHrs + spreadPayHrs) * (rate * 1.5);
+                // Day Off: (Work * 1.5) + (Spread bonus * 0.5)
+                grossPay = (workTowardOT * rate * 1.5) + (spreadPremiumHrs * rate * 0.5);
             } else {
-                grossPay = (straightHrs * rate) + (otHrs * rate * 1.5) + (bucketHrs * rate) + (spreadPayHrs * rate);
+                // Normal Day: (8hrs @ ST) + (OT @ 1.5) + (Spread bonus @ 0.5)
+                // This makes the Spread pay "Half-Time" so it matches her $526.50
+                grossPay = (straightHrs * rate) + (otActualHrs * rate * 1.5) + (spreadPremiumHrs * rate * 0.5);
             }
 
+            // 5. UPDATE UI
+            let payHours = grossPay / rate;
+            
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = isDayOff ? 
                 `<strong>DAY OFF MODE: 1.5x Multiplier Applied</strong>` :
-                `Platform: ${platformHrs.toFixed(2)} | OT: ${otHrs.toFixed(2)} | Spread: ${spreadPayHrs.toFixed(2)}`;
+                `Platform: ${platformHrs.toFixed(2)} | OT: ${otActualHrs.toFixed(2)} | Spread: ${spreadPremiumHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
                 `Buckets (Report/Travel): ${bucketHrs.toFixed(2)}<br>` +
-                `Premium-Spread: ${spreadPayHrs.toFixed(2)}<br>` +
-                `Equivalent Pay Hours: ${(grossPay / rate).toFixed(2)}`;
+                `Premium-Spread: ${spreadPremiumHrs.toFixed(2)}<br>` +
+                `<strong>Equivalent Pay Hours: ${payHours.toFixed(2)}</strong>`;
         }
     </script>
 </body>
