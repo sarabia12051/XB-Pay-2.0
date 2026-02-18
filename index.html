@@ -13,7 +13,8 @@
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
         input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.85em; }
+        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
+        .toggle-box { padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; background: #fff; }
         .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
@@ -34,9 +35,17 @@
         
         <hr style="margin-top:20px; border: 0; border-top: 1px solid #eee;">
         
+        <div class="toggle-box">
+            <div class="row">
+                <input type="checkbox" id="isExtraBoard" checked> 
+                <span style="font-weight:bold;">Extra Board Operator?</span>
+            </div>
+            <span class="mini-label">(Caps spread bonus at 30 mins per Sec 9.3)</span>
+        </div>
+
         <label>Piece 1</label>
         <span class="mini-label">Report Time (Mins)</span>
-        <input type="number" id="r1" value="0">
+        <input type="number" id="r1" value="15">
         <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
@@ -69,14 +78,13 @@
         </div>
 
         <div class="disclaimer">
-            Unofficial tool. Consult your timekeeper for accuracy.
+            Unofficial tool based on 2025-2029 Contract.
         </div>
     </div>
 
     <script>
         function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 
-        // Custom function to round to the nearest 100th, always rounding .005 UP
         function vtaRound(value) {
             return Math.ceil(value * 100) / 100;
         }
@@ -92,9 +100,11 @@
             const r2 = parseFloat(document.getElementById('r2').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
             const isDayOff = document.getElementById('isDayOff').checked;
+            const isXB = document.getElementById('isExtraBoard').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
+            // Handle overnight shifts
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
@@ -107,26 +117,42 @@
             let platformHrs = (p1 + p2) / 60;
             let reportHrs = (r1 + r2) / 60;
             let travelHrs = travelMins / 60;
+            let workTotal = platformHrs + reportHrs;
             
-            // 2. OT MATH (Exclude Travel)
-            let workSubjectToOT = platformHrs + reportHrs;
-            let rawOTOver = Math.max(0, workSubjectToOT - 8);
+            // 2. OT MATH (Work over 8 hrs)
+            let rawOTOver = Math.max(0, workTotal - 8);
             let otPremiumValue = vtaRound(rawOTOver * 0.5);
 
             // 3. SPREAD MATH
-            let firstStart = s1_s;
+            let firstStart = s1_s - r1; // Start includes report time
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstStart) / 60;
             
-            let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
-            let spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
+            // Per Section 10: Spread calculation excludes report time
+            let adjustedSpan = totalSpanHrs - reportHrs;
+            let rawSpreadOver = Math.max(0, adjustedSpan - 10.5);
+            
+            let spreadPremiumValue;
+            let spreadStatus = "";
+            if (isXB) {
+                // XB RULE: Penalty bonus ONLY between 10.5 and 11 hrs (Max 0.5 bonus hours)
+                let bonusEligible = Math.min(rawSpreadOver, 0.5);
+                spreadPremiumValue = vtaRound(bonusEligible * 0.5);
+                spreadStatus = rawSpreadOver > 0.5 ? "(XB Cap Applied)" : "";
+            } else {
+                // REGULAR RULE: Unlimited 0.5 penalty
+                spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
+            }
 
-            // 4. TOTALS
+            // 4. TOTAL PAY HOURS
             let totalPayHours;
             if (isDayOff) {
-                totalPayHours = vtaRound(((workSubjectToOT + travelHrs) * 1.5) + spreadPremiumValue);
+                // RDO pay is Time and a Half for everything + Spread Premium
+                totalPayHours = vtaRound(((workTotal + travelHrs) * 1.5) + spreadPremiumValue);
             } else {
-                totalPayHours = vtaRound(workSubjectToOT + travelHrs + otPremiumValue + spreadPremiumValue);
+                // Guarantee check (8-hour guarantee)
+                let baseWithGuarantee = Math.max(8, workTotal);
+                totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
             }
             
             let grossPay = totalPayHours * rate;
@@ -135,12 +161,11 @@
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Platform Time: ${platformHrs.toFixed(2)}<br>` +
-                `Total Report: ${reportHrs.toFixed(2)}<br>` +
-                `Travel Time: ${travelHrs.toFixed(2)}<br>` +
+                `Work Time: ${workTotal.toFixed(2)} hrs<br>` +
+                `Spread Span: ${adjustedSpan.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
-                `OT Premium (0.5): ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` +
-                `Spread Prem (0.5): ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` +
+                `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
+                `Spread Prem (0.5x): ${spreadPremiumValue.toFixed(2)} units ${spreadStatus}<br>` +
                 `-----------------------<br>` +
                 `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
         }
