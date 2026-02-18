@@ -45,7 +45,7 @@
 
         <label>Piece 1</label>
         <span class="mini-label">Report Time (Mins)</span>
-        <input type="number" id="r1" value="15">
+        <input type="number" id="r1" value="0">
         <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
@@ -104,14 +104,12 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // Handle overnight shifts
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. WORK TIME
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
@@ -119,38 +117,30 @@
             let travelHrs = travelMins / 60;
             let workTotal = platformHrs + reportHrs;
             
-            // 2. OT MATH (Work over 8 hrs)
             let rawOTOver = Math.max(0, workTotal - 8);
             let otPremiumValue = vtaRound(rawOTOver * 0.5);
 
-            // 3. SPREAD MATH
-            let firstStart = s1_s - r1; // Start includes report time
+            let firstStart = s1_s - r1; 
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstStart) / 60;
             
-            // Per Section 10: Spread calculation excludes report time
             let adjustedSpan = totalSpanHrs - reportHrs;
             let rawSpreadOver = Math.max(0, adjustedSpan - 10.5);
             
             let spreadPremiumValue;
             let spreadStatus = "";
             if (isXB) {
-                // XB RULE: Penalty bonus ONLY between 10.5 and 11 hrs (Max 0.5 bonus hours)
                 let bonusEligible = Math.min(rawSpreadOver, 0.5);
                 spreadPremiumValue = vtaRound(bonusEligible * 0.5);
                 spreadStatus = rawSpreadOver > 0.5 ? "(XB Cap Applied)" : "";
             } else {
-                // REGULAR RULE: Unlimited 0.5 penalty
                 spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
             }
 
-            // 4. TOTAL PAY HOURS
             let totalPayHours;
             if (isDayOff) {
-                // RDO pay is Time and a Half for everything + Spread Premium
                 totalPayHours = vtaRound(((workTotal + travelHrs) * 1.5) + spreadPremiumValue);
             } else {
-                // Guarantee check (8-hour guarantee)
                 let baseWithGuarantee = Math.max(8, workTotal);
                 totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
             }
