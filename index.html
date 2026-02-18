@@ -89,29 +89,31 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. WORK TIME
+            // 1. WORK TIME (BASE)
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
 
-            // 2. SPREAD MATH
+            // 2. SPREAD CALC (0.5 PREMIUM)
             let firstReport = s1_s;
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstReport) / 60;
             
             let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
-            let spreadPayHrs = rawSpreadOver * 0.5;
+            let spreadPremiumValue = rawSpreadOver * 0.5;
 
-            // 3. OVERTIME MATH
+            // 3. OVERTIME CALC (0.5 PREMIUM)
             let rawOTOver = Math.max(0, platformHrs - 8);
-            let otPayHrs = rawOTOver * 0.5;
+            let otPremiumValue = rawOTOver * 0.5;
 
-            // 4. FINAL PAY HOURS
+            // 4. FINAL PAY CALCULATION
             let equivalentPayHours;
             if (isDayOff) {
-                equivalentPayHours = (platformHrs * 1.5) + spreadPayHrs + travelHrs;
+                // Working Day Off: Platform @ 1.5x + Spread @ 0.5x + Travel @ 1.0x
+                equivalentPayHours = (platformHrs * 1.5) + spreadPremiumValue + travelHrs;
             } else {
-                equivalentPayHours = platformHrs + otPayHrs + spreadPayHrs + travelHrs;
+                // Normal Day: Platform @ 1.0x + OT @ 0.5x + Spread @ 0.5x + Travel @ 1.0x
+                equivalentPayHours = platformHrs + otPremiumValue + spreadPremiumValue + travelHrs;
             }
             
             let grossPay = equivalentPayHours * rate;
@@ -119,12 +121,11 @@
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
-            // CLEARLY BREAK DOWN THE SPREAD AND OT IN THE AUDIT
             document.getElementById('audit-details').innerHTML = 
                 `Platform: ${platformHrs.toFixed(2)} hrs<br>` +
-                `Travel: ${travelHrs.toFixed(2)} hrs (Flat)<br>` +
-                (rawOTOver > 0 ? `OT Over 8: ${rawOTOver.toFixed(2)} x 0.5 = ${otPayHrs.toFixed(2)}<br>` : `OT Over 8: 0.00<br>`) +
-                (rawSpreadOver > 0 ? `Spread Over 10.5: ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPayHrs.toFixed(2)}<br>` : `Spread Over 10.5: 0.00<br>`) +
+                `Travel: ${travelHrs.toFixed(2)} hrs (Flat Rate)<br>` +
+                (rawOTOver > 0 ? `OT Premium (0.5): ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` : `OT Premium: 0.00<br>`) +
+                (rawSpreadOver > 0 ? `Spread Prem (0.5): ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` : `Spread Prem: 0.00<br>`) +
                 `-----------------------<br>` +
                 `<strong>Total Pay Hours: ${equivalentPayHours.toFixed(2)}</strong>`;
         }
