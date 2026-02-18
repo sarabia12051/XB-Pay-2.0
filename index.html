@@ -8,8 +8,6 @@
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
-        .logo-container { text-align: center; margin-bottom: 10px; }
-        .logo-container img { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; }
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
         input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
@@ -18,38 +16,38 @@
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
-        .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
+        .mini-label { font-size: 0.8em; color: #666; margin-top: 4px; display: block; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="logo-container">
-            <img src="icon.png" alt="App Icon">
-        </div>
-        
         <h2>VTA Pay Auditor</h2>
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
         
-        <label>Piece 1 (Sign-in to Relief)</label>
+        <hr style="margin-top:20px; border: 0; border-top: 1px solid #eee;">
+        
+        <label>Piece 1</label>
+        <span class="mini-label">Report Time (Mins)</span>
+        <input type="number" id="r1" value="0">
+        <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         
-        <label>Piece 2 (Start to Finish)</label>
+        <label>Piece 2</label>
+        <span class="mini-label">Report Time (Mins)</span>
+        <input type="number" id="r2" value="0">
+        <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
 
-        <label>Travel Time (Flat Rate Minutes)</label>
+        <label>Travel Time (Total Mins)</label>
         <input type="number" id="travel" value="0">
 
         <div class="day-off-row">
             <div class="row">
                 <input type="checkbox" id="isDayOff"> 
-                <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? 
-                    <span style="font-weight: normal; font-size: 0.85em; display: block; margin-top: 3px;">
-                        (Pays 1.5x for work hours + Spread)
-                    </span>
-                </span>
+                <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF?</span>
             </div>
         </div>
 
@@ -57,15 +55,10 @@
 
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
-            <div id="stats" style="font-size: 0.9em; margin-top: 8px; line-height: 1.6;"></div>
             <div class="audit">
                 <strong>CONTRACT AUDIT:</strong><br>
                 <span id="audit-details"></span>
             </div>
-        </div>
-
-        <div class="disclaimer">
-            Unofficial tool. Consult your timekeeper for accuracy.
         </div>
     </div>
 
@@ -78,56 +71,65 @@
             let s1_e = getMinutes(document.getElementById('s1_end').value);
             let s2_s = getMinutes(document.getElementById('s2_start').value);
             let s2_e = getMinutes(document.getElementById('s2_end').value);
-            const travelHrs = (parseFloat(document.getElementById('travel').value) || 0) / 60;
+            
+            const r1 = parseFloat(document.getElementById('r1').value) || 0;
+            const r2 = parseFloat(document.getElementById('r2').value) || 0;
+            const travelMins = parseFloat(document.getElementById('travel').value) || 0;
             const isDayOff = document.getElementById('isDayOff').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
+            // Overnight Handling
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. WORK TIME (BASE)
+            // 1. WORK TIME (Platform + Reports)
             let p1 = s1_e - s1_s;
-            let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
+            let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
+            let reportHrs = (r1 + r2) / 60;
+            let travelHrs = travelMins / 60;
+            
+            // Total Work for OT (Usually Platform + Report + Travel)
+            let totalWorkForOT = platformHrs + reportHrs + travelHrs;
 
-            // 2. SPREAD CALC (0.5 PREMIUM)
-            let firstReport = s1_s;
+            // 2. SPREAD CALC (Strictly on Span of Work)
+            let firstStart = s1_s;
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
-            let totalSpanHrs = (lastEnd - firstReport) / 60;
+            let totalSpanHrs = (lastEnd - firstStart) / 60;
             
             let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
             let spreadPremiumValue = rawSpreadOver * 0.5;
 
-            // 3. OVERTIME CALC (0.5 PREMIUM)
-            let rawOTOver = Math.max(0, platformHrs - 8);
+            // 3. OVERTIME CALC (0.5 Premium over 8 hrs)
+            let rawOTOver = Math.max(0, totalWorkForOT - 8);
             let otPremiumValue = rawOTOver * 0.5;
 
-            // 4. FINAL PAY CALCULATION
-            let equivalentPayHours;
+            // 4. FINAL PAY
+            let totalPayHours;
             if (isDayOff) {
-                // Working Day Off: Platform @ 1.5x + Spread @ 0.5x + Travel @ 1.0x
-                equivalentPayHours = (platformHrs * 1.5) + spreadPremiumValue + travelHrs;
+                totalPayHours = (totalWorkForOT * 1.5) + spreadPremiumValue;
             } else {
-                // Normal Day: Platform @ 1.0x + OT @ 0.5x + Spread @ 0.5x + Travel @ 1.0x
-                equivalentPayHours = platformHrs + otPremiumValue + spreadPremiumValue + travelHrs;
+                totalPayHours = totalWorkForOT + otPremiumValue + spreadPremiumValue;
             }
             
-            let grossPay = equivalentPayHours * rate;
+            let grossPay = totalPayHours * rate;
 
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Platform: ${platformHrs.toFixed(2)} hrs<br>` +
-                `Travel: ${travelHrs.toFixed(2)} hrs (Flat Rate)<br>` +
-                (rawOTOver > 0 ? `OT Premium (0.5): ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` : `OT Premium: 0.00<br>`) +
-                (rawSpreadOver > 0 ? `Spread Prem (0.5): ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` : `Spread Prem: 0.00<br>`) +
+                `Platform Time: ${platformHrs.toFixed(2)}<br>` +
+                `Total Report: ${reportHrs.toFixed(2)}<br>` +
+                `Travel Time: ${travelHrs.toFixed(2)}<br>` +
                 `-----------------------<br>` +
-                `<strong>Total Pay Hours: ${equivalentPayHours.toFixed(2)}</strong>`;
+                `OT Over 8: ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` +
+                `Spread Over 10.5: ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` +
+                `-----------------------<br>` +
+                `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
         }
     </script>
 </body>
