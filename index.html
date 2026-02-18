@@ -76,6 +76,11 @@
     <script>
         function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 
+        // Custom function to round to the nearest 100th, always rounding .005 UP
+        function vtaRound(value) {
+            return Math.ceil(value * 100) / 100;
+        }
+
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
             let s1_s = getMinutes(document.getElementById('s1_start').value);
@@ -90,58 +95,52 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // Handle overnight shifts
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. WORK TIME CALCULATIONS
+            // 1. WORK TIME
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
             let reportHrs = (r1 + r2) / 60;
             let travelHrs = travelMins / 60;
             
-            // 2. OVERTIME MATH (Excluding Travel)
-            // Only Platform + Report count toward the 8-hour OT trigger
+            // 2. OT MATH (Exclude Travel)
             let workSubjectToOT = platformHrs + reportHrs;
             let rawOTOver = Math.max(0, workSubjectToOT - 8);
-            // Rounding up to 2 decimal places (e.g., 0.735 -> 0.74)
-            let otPremiumValue = Math.round((rawOTOver * 0.5) * 100) / 100;
+            let otPremiumValue = vtaRound(rawOTOver * 0.5);
 
-            // 3. SPREAD MATH (Strictly Span: First Drive Start to Last Drive End)
+            // 3. SPREAD MATH
             let firstStart = s1_s;
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstStart) / 60;
             
             let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
-            let spreadPremiumValue = Math.round((rawSpreadOver * 0.5) * 100) / 100;
+            let spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
 
-            // 4. FINAL PAY HOURS
+            // 4. TOTALS
             let totalPayHours;
             if (isDayOff) {
-                // Day Off: (All work components) * 1.5 + Spread
-                totalPayHours = ((workSubjectToOT + travelHrs) * 1.5) + spreadPremiumValue;
+                totalPayHours = vtaRound(((workSubjectToOT + travelHrs) * 1.5) + spreadPremiumValue);
             } else {
-                // Normal: Platform + Report + Travel + OT Prem + Spread Prem
-                totalPayHours = workSubjectToOT + travelHrs + otPremiumValue + spreadPremiumValue;
+                totalPayHours = vtaRound(workSubjectToOT + travelHrs + otPremiumValue + spreadPremiumValue);
             }
             
             let grossPay = totalPayHours * rate;
 
-            // DISPLAY RESULTS
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
                 `Total Report: ${reportHrs.toFixed(2)}<br>` +
-                `Travel Time: ${travelHrs.toFixed(2)} (Flat Rate)<br>` +
+                `Travel Time: ${travelHrs.toFixed(2)}<br>` +
                 `-----------------------<br>` +
-                `OT Over 8: ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` +
-                `Spread Over 10.5: ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` +
+                `OT Premium (0.5): ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` +
+                `Spread Prem (0.5): ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` +
                 `-----------------------<br>` +
                 `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
         }
