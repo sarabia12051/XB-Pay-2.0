@@ -5,10 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VTA Pay Auditor</title>
     
-    <link rel="icon" type="image/png" href="icon.png">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="manifest" href="manifest.json">
-
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -23,7 +19,6 @@
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
         .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
-        .note { font-style: italic; font-size: 0.8em; color: #666; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -36,16 +31,13 @@
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
         
-        <label>Piece 1</label>
+        <label>Piece 1 (Sign-in to Relief)</label>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         
-        <label>Piece 2</label>
+        <label>Piece 2 (Start to Finish)</label>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
-
-        <label>Report/Standby (Minutes)</label>
-        <input type="number" id="report_standby" value="0">
 
         <label>Travel Time (Minutes)</label>
         <input type="number" id="travel" value="0">
@@ -54,8 +46,8 @@
             <div class="row">
                 <input type="checkbox" id="isDayOff"> 
                 <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? 
-                    <span style="font-weight: normal; font-size: 0.9em; display: block; margin-top: 3px;">
-                        (Note: Saturday and Sunday are considered overtime, not weekdays worked as days off)
+                    <span style="font-weight: normal; font-size: 0.85em; display: block; margin-top: 3px;">
+                        (Pays 1.5x for all work + Spread)
                     </span>
                 </span>
             </div>
@@ -86,7 +78,6 @@
             let s1_e = getMinutes(document.getElementById('s1_end').value);
             let s2_s = getMinutes(document.getElementById('s2_start').value);
             let s2_e = getMinutes(document.getElementById('s2_end').value);
-            const standbyMins = parseFloat(document.getElementById('report_standby').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
             const isDayOff = document.getElementById('isDayOff').checked;
 
@@ -99,46 +90,41 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. CALCULATE TOTAL WORK TIME (ST)
-            // Lisa's way: Platform + Report + Travel = Total Work Hours
+            // 1. CUMULATIVE WORK TIME (Platform + Travel)
+            // Report is included in Piece 1 Start
             let p1 = s1_e - s1_s;
-            let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
-            let totalWorkHrs = (p1 + p2 + standbyMins + travelMins) / 60;
+            let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
+            let totalWorkHrs = (p1 + p2 + travelMins) / 60;
 
-            // 2. CALCULATE SPREAD PREMIUM (0.5 bonus)
-            // New Contract Rule: Spread starts at 10:30 (10.5 hrs)
-            let firstReport = s1_s - standbyMins;
+            // 2. SPREAD PREMIUM (0.5 bonus after 10:30 span)
+            let firstReport = s1_s;
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstReport) / 60;
             
             let spreadPremiumHrs = 0;
             if (totalSpanHrs > 10.5) {
-                // We multiply by 0.5 because the base hour is already inside 'totalWorkHrs'
                 spreadPremiumHrs = (totalSpanHrs - 10.5) * 0.5;
             }
 
-            // 3. CALCULATE OVERTIME PREMIUM (0.5 bonus)
-            // Anything over 8 hours of total work gets the 0.5 bonus
+            // 3. OVERTIME PREMIUM (0.5 bonus after 8 hours work)
             let otPremiumHrs = 0;
             if (totalWorkHrs > 8) {
                 otPremiumHrs = (totalWorkHrs - 8) * 0.5;
             }
 
-            // 4. FINAL PAY CALCULATION
-            let grossPay;
+            // 4. FINAL CALCULATION
             let equivalentPayHours;
-
             if (isDayOff) {
-                // Working Day Off is 1.5x for all work + spread bonus
+                // Day Off = Work * 1.5 + Spread Bonus
                 equivalentPayHours = (totalWorkHrs * 1.5) + spreadPremiumHrs;
             } else {
-                // Normal Day: Base Work + OT Bonus + Spread Bonus
+                // Normal Day = Work + OT Bonus + Spread Bonus
                 equivalentPayHours = totalWorkHrs + otPremiumHrs + spreadPremiumHrs;
             }
             
-            grossPay = equivalentPayHours * rate;
+            let grossPay = equivalentPayHours * rate;
 
-            // DISPLAY RESULTS
+            // DISPLAY
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             document.getElementById('stats').innerHTML = isDayOff ? 
@@ -146,7 +132,7 @@
                 `Work: ${totalWorkHrs.toFixed(2)} | OT Prem: ${otPremiumHrs.toFixed(2)} | Spread Prem: ${spreadPremiumHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work Time: ${totalWorkHrs.toFixed(2)}<br>` +
+                `Total Work (incl. Travel): ${totalWorkHrs.toFixed(2)}<br>` +
                 `Overtime Bonus (0.5): ${otPremiumHrs.toFixed(2)}<br>` +
                 `Spread Bonus (0.5): ${spreadPremiumHrs.toFixed(2)}<br>` +
                 `<strong>Total Pay Hours: ${equivalentPayHours.toFixed(2)}</strong>`;
