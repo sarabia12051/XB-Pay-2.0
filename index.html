@@ -8,6 +8,8 @@
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
+        .logo-container { text-align: center; margin-bottom: 10px; }
+        .logo-container img { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; }
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
         input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
@@ -17,10 +19,15 @@
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
         .mini-label { font-size: 0.8em; color: #666; margin-top: 4px; display: block; }
+        .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="card">
+        <div class="logo-container">
+            <img src="icon.png" alt="App Icon">
+        </div>
+        
         <h2>VTA Pay Auditor</h2>
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
@@ -60,6 +67,10 @@
                 <span id="audit-details"></span>
             </div>
         </div>
+
+        <div class="disclaimer">
+            Unofficial tool. Consult your timekeeper for accuracy.
+        </div>
     </div>
 
     <script>
@@ -79,52 +90,55 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // Overnight Handling
+            // Handle overnight shifts
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. WORK TIME (Platform + Reports)
+            // 1. WORK TIME CALCULATIONS
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
             let reportHrs = (r1 + r2) / 60;
             let travelHrs = travelMins / 60;
             
-            // Total Work for OT (Usually Platform + Report + Travel)
-            let totalWorkForOT = platformHrs + reportHrs + travelHrs;
+            // 2. OVERTIME MATH (Excluding Travel)
+            // Only Platform + Report count toward the 8-hour OT trigger
+            let workSubjectToOT = platformHrs + reportHrs;
+            let rawOTOver = Math.max(0, workSubjectToOT - 8);
+            // Rounding up to 2 decimal places (e.g., 0.735 -> 0.74)
+            let otPremiumValue = Math.round((rawOTOver * 0.5) * 100) / 100;
 
-            // 2. SPREAD CALC (Strictly on Span of Work)
+            // 3. SPREAD MATH (Strictly Span: First Drive Start to Last Drive End)
             let firstStart = s1_s;
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstStart) / 60;
             
             let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
-            let spreadPremiumValue = rawSpreadOver * 0.5;
+            let spreadPremiumValue = Math.round((rawSpreadOver * 0.5) * 100) / 100;
 
-            // 3. OVERTIME CALC (0.5 Premium over 8 hrs)
-            let rawOTOver = Math.max(0, totalWorkForOT - 8);
-            let otPremiumValue = rawOTOver * 0.5;
-
-            // 4. FINAL PAY
+            // 4. FINAL PAY HOURS
             let totalPayHours;
             if (isDayOff) {
-                totalPayHours = (totalWorkForOT * 1.5) + spreadPremiumValue;
+                // Day Off: (All work components) * 1.5 + Spread
+                totalPayHours = ((workSubjectToOT + travelHrs) * 1.5) + spreadPremiumValue;
             } else {
-                totalPayHours = totalWorkForOT + otPremiumValue + spreadPremiumValue;
+                // Normal: Platform + Report + Travel + OT Prem + Spread Prem
+                totalPayHours = workSubjectToOT + travelHrs + otPremiumValue + spreadPremiumValue;
             }
             
             let grossPay = totalPayHours * rate;
 
+            // DISPLAY RESULTS
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)}<br>` +
                 `Total Report: ${reportHrs.toFixed(2)}<br>` +
-                `Travel Time: ${travelHrs.toFixed(2)}<br>` +
+                `Travel Time: ${travelHrs.toFixed(2)} (Flat Rate)<br>` +
                 `-----------------------<br>` +
                 `OT Over 8: ${rawOTOver.toFixed(2)} x 0.5 = ${otPremiumValue.toFixed(2)}<br>` +
                 `Spread Over 10.5: ${rawSpreadOver.toFixed(2)} x 0.5 = ${spreadPremiumValue.toFixed(2)}<br>` +
