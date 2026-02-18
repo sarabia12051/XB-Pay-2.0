@@ -39,7 +39,7 @@
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
 
-        <label>Travel Time (Minutes)</label>
+        <label>Travel Time (Flat Rate Minutes)</label>
         <input type="number" id="travel" value="0">
 
         <div class="day-off-row">
@@ -47,7 +47,7 @@
                 <input type="checkbox" id="isDayOff"> 
                 <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF? 
                     <span style="font-weight: normal; font-size: 0.85em; display: block; margin-top: 3px;">
-                        (Pays 1.5x for all work + Spread)
+                        (Pays 1.5x for work hours + Spread)
                     </span>
                 </span>
             </div>
@@ -78,7 +78,7 @@
             let s1_e = getMinutes(document.getElementById('s1_end').value);
             let s2_s = getMinutes(document.getElementById('s2_start').value);
             let s2_e = getMinutes(document.getElementById('s2_end').value);
-            const travelMins = parseFloat(document.getElementById('travel').value) || 0;
+            const travelHrs = (parseFloat(document.getElementById('travel').value) || 0) / 60;
             const isDayOff = document.getElementById('isDayOff').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
@@ -90,13 +90,13 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // 1. CUMULATIVE WORK TIME (Platform + Travel)
-            // Report is included in Piece 1 Start
+            // 1. WORK TIME (Platform only)
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
-            let totalWorkHrs = (p1 + p2 + travelMins) / 60;
+            let platformHrs = (p1 + p2) / 60;
 
             // 2. SPREAD PREMIUM (0.5 bonus after 10:30 span)
+            // Travel is flat rate, so it is NOT included in the span calculation
             let firstReport = s1_s;
             let lastEnd = (s2_s !== null ? s2_e : s1_e);
             let totalSpanHrs = (lastEnd - firstReport) / 60;
@@ -106,20 +106,21 @@
                 spreadPremiumHrs = (totalSpanHrs - 10.5) * 0.5;
             }
 
-            // 3. OVERTIME PREMIUM (0.5 bonus after 8 hours work)
+            // 3. OVERTIME PREMIUM (0.5 bonus after 8 hours Platform)
+            // Travel is flat rate, so it does NOT trigger OT
             let otPremiumHrs = 0;
-            if (totalWorkHrs > 8) {
-                otPremiumHrs = (totalWorkHrs - 8) * 0.5;
+            if (platformHrs > 8) {
+                otPremiumHrs = (platformHrs - 8) * 0.5;
             }
 
             // 4. FINAL CALCULATION
             let equivalentPayHours;
             if (isDayOff) {
-                // Day Off = Work * 1.5 + Spread Bonus
-                equivalentPayHours = (totalWorkHrs * 1.5) + spreadPremiumHrs;
+                // Day Off = (Platform * 1.5) + Spread Bonus + Flat Travel
+                equivalentPayHours = (platformHrs * 1.5) + spreadPremiumHrs + travelHrs;
             } else {
-                // Normal Day = Work + OT Bonus + Spread Bonus
-                equivalentPayHours = totalWorkHrs + otPremiumHrs + spreadPremiumHrs;
+                // Normal Day = Platform + OT Bonus + Spread Bonus + Flat Travel
+                equivalentPayHours = platformHrs + otPremiumHrs + spreadPremiumHrs + travelHrs;
             }
             
             let grossPay = equivalentPayHours * rate;
@@ -127,12 +128,10 @@
             // DISPLAY
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
-            document.getElementById('stats').innerHTML = isDayOff ? 
-                `<strong>DAY OFF MODE: 1.5x Multiplier Applied</strong>` :
-                `Work: ${totalWorkHrs.toFixed(2)} | OT Prem: ${otPremiumHrs.toFixed(2)} | Spread Prem: ${spreadPremiumHrs.toFixed(2)}`;
             
             document.getElementById('audit-details').innerHTML = 
-                `Total Work (incl. Travel): ${totalWorkHrs.toFixed(2)}<br>` +
+                `Platform Hours: ${platformHrs.toFixed(2)}<br>` +
+                `Travel (Flat Rate): ${travelHrs.toFixed(2)}<br>` +
                 `Overtime Bonus (0.5): ${otPremiumHrs.toFixed(2)}<br>` +
                 `Spread Bonus (0.5): ${spreadPremiumHrs.toFixed(2)}<br>` +
                 `<strong>Total Pay Hours: ${equivalentPayHours.toFixed(2)}</strong>`;
