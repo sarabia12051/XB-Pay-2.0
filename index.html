@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pay Auditor</title>
+    <title>VTA Pay Auditor</title>
     
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
@@ -110,16 +110,22 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
+            // WORK CATEGORIES
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
+            
+            // Turn-in (Sec 12): 15m single, 20m combo (10m each)
+            let turnInHrs = (s2_s !== null) ? (20 / 60) : (15 / 60);
 
             let isolatedReportHrs = (r1 + r2) / 60;
             let travelHrs = travelMins / 60;
 
-            let rawOTOver = Math.max(0, platformHrs - 8);
+            // OT CLOCK (Platform + Turn-in) - Excludes Report per Sec 10
+            let rawOTOver = Math.max(0, (platformHrs + turnInHrs) - 8);
             let otPremiumValue = vtaRound(rawOTOver * 0.5);
 
+            // SPREAD CLOCK (Drive Start to Drive End ONLY)
             let totalSpanHrs = (s2_s !== null && s2_e !== null ? (s2_e - s1_s) : (s1_e - s1_s)) / 60;
             let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
             
@@ -127,10 +133,8 @@
             let xbStepUpValue = 0;
 
             if (isXB) {
-                // Section 9.3: 0.5x for first 30 mins, 1.0x after hour 11
                 let halfTimeWindow = Math.min(rawSpreadOver, 0.5);
                 spreadPremiumValue += vtaRound(halfTimeWindow * 0.5);
-                
                 if (rawSpreadOver > 0.5) {
                     xbStepUpValue = vtaRound((rawSpreadOver - 0.5) * 1.0);
                     spreadPremiumValue += xbStepUpValue;
@@ -139,11 +143,13 @@
                 spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
             }
 
+            // FINAL CALCULATION
             let totalPayHours;
             if (isDayOff) {
-                totalPayHours = vtaRound(((platformHrs + isolatedReportHrs + travelHrs) * 1.5) + spreadPremiumValue);
+                totalPayHours = vtaRound(((platformHrs + turnInHrs + isolatedReportHrs + travelHrs) * 1.5) + spreadPremiumValue);
             } else {
-                let baseWithGuarantee = Math.max(8, (platformHrs + isolatedReportHrs));
+                // Guarantee is on Work + Turn-in + Report
+                let baseWithGuarantee = Math.max(8, (platformHrs + turnInHrs + isolatedReportHrs));
                 totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
             }
             
@@ -156,6 +162,7 @@
 
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)} hrs<br>` +
+                `Turn-in Time: ${turnInHrs.toFixed(2)} hrs<br>` +
                 `Spread Span: ${totalSpanHrs.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
                 `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
