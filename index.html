@@ -26,7 +26,7 @@
         <div class="toggle-box">
             <div class="row">
                 <input type="checkbox" id="isExtraBoard"> 
-                <span>Extra Board Operator? (1.0x after 11h span)</span>
+                <span>Extra Board Operator?</span>
             </div>
         </div>
 
@@ -69,11 +69,11 @@
             let p2 = (s2_s && s2_e) ? ((s2_e < s2_s) ? (s2_e + 1440 - s2_s) : (s2_e - s2_s)) : 0;
             let platformHrs = (p1 + p2) / 60;
 
-            // 2. Report Time (15 mins)
+            // 2. Report Time (Isolated 15 mins)
             let reportHrs = 0.25; 
 
             // 3. SOT-OPER Calculation (Platform + Report - 8)
-            let totalWork = platformHrs + reportHrs;
+            let totalWork = platformHrs + reportHrs; // The 15 mins is included here for the OT trigger
             let sotUnits = vtaRound(Math.max(0, totalWork - 8));
 
             // 4. SPR-OPER Calculation
