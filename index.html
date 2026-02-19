@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VTA Pay Auditor v2.0</title>
+    <title>VTA Pay Auditor v3.0 (Line-by-Line)</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 450px; margin: auto; }
@@ -11,7 +11,6 @@
         label { font-weight: bold; display: block; margin-top: 15px; }
         select, input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         .toggle-box { padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; background: #fff; }
-        .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; display: flex; align-items: center; gap: 10px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
@@ -25,7 +24,7 @@
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
 
-        <label>Mode & Board</label>
+        <label>Operator Mode & Board</label>
         <select id="opType">
             <option value="bus_reg">Bus - Regular/Frag</option>
             <option value="bus_xb">Bus - Extra Board</option>
@@ -34,33 +33,23 @@
         </select>
 
         <div class="toggle-box">
-            <label>Piece 1 Start & End</label>
-            <div class="mini-label">(Actual Drive Start / Actual Pull-in)</div>
+            <label>Piece 1 (Drive Start/End)</label>
             <input type="time" id="s1_start">
             <input type="time" id="s1_end">
             
-            <label style="margin-top:15px;">Piece 2 Start & End</label>
-            <div class="mini-label">(Optional - For Split/Combos)</div>
+            <label style="margin-top:10px;">Piece 2 (Drive Start/End)</label>
             <input type="time" id="s2_start">
             <input type="time" id="s2_end">
         </div>
 
-        <label>Travel Time (Total Mins)</label>
+        <label>Travel Time (Mins)</label>
         <input type="number" id="travel" value="0">
-
-        <div class="day-off-row">
-            <input type="checkbox" id="isDayOff"> 
-            <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF?</span>
-        </div>
 
         <button onclick="calculate()">Audit Pay Now</button>
 
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
-            <div class="audit">
-                <strong>CONTRACT AUDIT:</strong><br>
-                <span id="audit-details"></span>
-            </div>
+            <div class="audit" id="audit-details"></div>
         </div>
     </div>
 
@@ -70,7 +59,6 @@
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
             const opType = document.getElementById('opType').value;
-            const isDayOff = document.getElementById('isDayOff').checked;
             
             let s1_s = getMinutes(document.getElementById('s1_start').value);
             let s1_e = getMinutes(document.getElementById('s1_end').value);
@@ -80,19 +68,61 @@
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // --- CONTRACT CONSTANTS ---
+            // CONTRACT VALUES (Sec 10 & 12)
             const isRail = opType.includes('rail');
             const isXB = opType.includes('xb');
-            const reportMins = isRail ? 25 : 15; // Sec 10
-            const turnInMins = (s2_s !== null) ? 20 : 15; // Sec 12
+            const rptHrs = (isRail ? 25 : 15) / 60; // Report Time
+            const turnInHrs = ((s2_s !== null) ? 20 : 15) / 60; // Turn-in Time
 
-            // Midnight crossover logic
+            // Midnight Crossover
             if (s1_e < s1_s) s1_e += 1440;
             if (s2_s !== null) {
                 if (s2_s < s1_e) s2_s += 1440;
                 if (s2_e < s2_s) s2_e += 1440;
             }
 
-            // --- 1. WORK TIME (FOR OVERTIME) ---
-            // Sec 10: Report is paid but NOT for OT/Penalty computation
-            let drivingMins = (s1_e - s1_
+            // LINE 1: PLATFORM TIME (Actual Driving)
+            let platformHrs = (s1_e - s1_s) / 60;
+            if (s2_s !== null) platformHrs += (s2_e - s2_s) / 60;
+
+            // LINE 2: TRAVEL TIME (Straight Time)
+            let trvHrs = travelMins / 60;
+
+            // LINE 3: SCHEDULED OVERTIME (SOT)
+            // OT is based on Platform + Turn-in over 8 hours
+            let workForOT = platformHrs + turnInHrs;
+            let sotUnits = Math.max(0, workForOT - 8) * 0.5;
+
+            // LINE 4: SPREAD PREMIUM (SPR)
+            // Sec 9.3: Excludes report, travel, turn-in
+            let elapsedHrs = (s2_s !== null) ? (s2_e - s1_s) / 60 : platformHrs;
+            let sprUnits = 0;
+            if (isXB) {
+                if (elapsedHrs > 10.5) {
+                    sprUnits += (Math.min(elapsedHrs, 11) - 10.5) * 0.5;
+                    if (elapsedHrs > 11) sprUnits += (elapsedHrs - 11); // One-time pay jump
+                }
+            } else {
+                sprUnits = Math.max(0, elapsedHrs - 10.5) * 0.5; // Sec 9.1
+            }
+
+            // TOTAL PAYABLE HOURS (Line by Line sum)
+            // We use the 8hr guarantee on (Platform + Report + Turn-in)
+            let baseGuarantee = Math.max(8, platformHrs + rptHrs + turnInHrs);
+            let totalPayHours = baseGuarantee + trvHrs + sotUnits + sprUnits;
+
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('total').innerText = `Total Pay: $${(totalPayHours * rate).toFixed(2)}`;
+            document.getElementById('audit-details').innerHTML = 
+                `<strong>VTA STUB BREAKDOWN:</strong><br>` +
+                `Platform Line: ${platformHrs.toFixed(2)} hrs<br>` +
+                `Report Time: ${rptHrs.toFixed(2)} hrs<br>` +
+                `Travel Time: ${trvHrs.toFixed(2)} hrs<br>` +
+                `Scheduled OT: ${sotUnits.toFixed(2)} units<br>` +
+                `Spread Premium: ${sprUnits.toFixed(2)} units<br>` +
+                `-----------------------<br>` +
+                `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
+        }
+    </script>
+</body>
+</html>
