@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VTA Pay Auditor</title>
-    
+    <title>VTA Pay Auditor (2025-2029)</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
-        .logo-container { text-align: center; margin-bottom: 10px; }
-        .logo-container img { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 450px; margin: auto; }
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
-        input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        select, input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
         .toggle-box { padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; background: #fff; }
         .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
@@ -20,44 +17,34 @@
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
         .mini-label { font-size: 0.8em; color: #666; margin-top: 4px; display: block; }
-        .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="logo-container">
-            <img src="icon.png" alt="App Icon">
-        </div>
-        
         <h2>VTA Pay Auditor</h2>
+        
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
-        
-        <hr style="margin-top:20px; border: 0; border-top: 1px solid #eee;">
-        
+
+        <label>Operator Type / Mode</label>
+        <select id="opType">
+            <option value="bus_reg">Bus - Regular Run</option>
+            <option value="bus_xb">Bus - Extra Board</option>
+            <option value="rail_reg">Rail - Regular Run</option>
+            <option value="rail_xb">Rail - Extra Board</option>
+        </select>
+
         <div class="toggle-box">
-            <div class="row">
-                <input type="checkbox" id="isExtraBoard" checked> 
-                <span style="font-weight:bold;">Extra Board Operator?</span>
-            </div>
-            <span class="mini-label">(Caps spread bonus at 30 mins per Sec 9.3)</span>
+            <label>Piece 1 (Start/End)</label>
+            <input type="time" id="s1_start">
+            <input type="time" id="s1_end">
+            
+            <label>Piece 2 (Start/End - Optional)</label>
+            <input type="time" id="s2_start">
+            <input type="time" id="s2_end">
         </div>
 
-        <label>Piece 1</label>
-        <span class="mini-label">Report Time (Mins)</span>
-        <input type="number" id="r1" value="0">
-        <span class="mini-label">Drive Start & End</span>
-        <input type="time" id="s1_start">
-        <input type="time" id="s1_end">
-        
-        <label>Piece 2</label>
-        <span class="mini-label">Report Time (Mins)</span>
-        <input type="number" id="r2" value="0">
-        <span class="mini-label">Drive Start & End</span>
-        <input type="time" id="s2_start">
-        <input type="time" id="s2_end">
-
-        <label>Travel Time (Total Mins)</label>
+        <label>Travel Time (Mins)</label>
         <input type="number" id="travel" value="0">
 
         <div class="day-off-row">
@@ -72,90 +59,97 @@
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
             <div class="audit">
-                <strong>CONTRACT AUDIT:</strong><br>
+                <strong>CONTRACT AUDIT (Sec 8-13):</strong><br>
                 <span id="audit-details"></span>
             </div>
-        </div>
-
-        <div class="disclaimer">
-            Unofficial tool based on 2025-2029 Contract.
         </div>
     </div>
 
     <script>
         function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 
-        function vtaRound(value) {
-            return Math.ceil(value * 100) / 100;
-        }
-
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
+            const opType = document.getElementById('opType').value;
+            const isDayOff = document.getElementById('isDayOff').checked;
+            
             let s1_s = getMinutes(document.getElementById('s1_start').value);
             let s1_e = getMinutes(document.getElementById('s1_end').value);
             let s2_s = getMinutes(document.getElementById('s2_start').value);
             let s2_e = getMinutes(document.getElementById('s2_end').value);
-            
-            const r1 = parseFloat(document.getElementById('r1').value) || 0;
-            const r2 = parseFloat(document.getElementById('r2').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
-            const isDayOff = document.getElementById('isDayOff').checked;
-            const isXB = document.getElementById('isExtraBoard').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            if (s1_e < s1_s) s1_e += 1440; 
-            if (s2_s !== null && s2_e !== null) {
-                if (s2_s < s1_e) s2_s += 1440; 
-                if (s2_e < s2_s) s2_e += 1440; 
+            // Define Contractual Report/Turn-in times
+            const isRail = opType.includes('rail');
+            const isXB = opType.includes('xb');
+            const reportMins = isRail ? 25 : 15; // Sec 10
+            const turnInMins = (s2_s !== null) ? 20 : 15; // Sec 12 (10m per piece vs 15m single)
+
+            // Adjust for midnight crossovers
+            if (s1_e < s1_s) s1_e += 1440;
+            if (s2_s !== null) {
+                if (s2_s < s1_e) s2_s += 1440;
+                if (s2_e < s2_s) s2_e += 1440;
             }
 
-            let p1 = s1_e - s1_s;
-            let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
-            let platformHrs = (p1 + p2) / 60;
-            let reportHrs = (r1 + r2) / 60;
-            let travelHrs = travelMins / 60;
-            let workTotal = platformHrs + reportHrs;
-            
-            let rawOTOver = Math.max(0, workTotal - 8);
-            let otPremiumValue = vtaRound(rawOTOver * 0.5);
+            // 1. Work Time (Platform + Report + Turn-in)
+            let platformMins = (s1_e - s1_s) + ((s2_s !== null) ? (s2_e - s2_s) : 0);
+            let workMins = platformMins + reportMins + turnInMins;
+            let workHrs = workMins / 60;
 
-            let firstStart = s1_s - r1; 
-            let lastEnd = (s2_s !== null ? s2_e : s1_e);
-            let totalSpanHrs = (lastEnd - firstStart) / 60;
-            
-            let adjustedSpan = totalSpanHrs - reportHrs;
-            let rawSpreadOver = Math.max(0, adjustedSpan - 10.5);
-            
-            let spreadPremiumValue;
-            let spreadStatus = "";
+            // 2. Spread/Elapsed Time Calculation
+            // Sec 9 & 10: Report & Travel are EXCLUDED from elapsed time for spread premium
+            let firstStart = s1_s; 
+            let lastEnd = (s2_s !== null) ? s2_e : s1_e;
+            let elapsedMins = lastEnd - firstStart; 
+            let elapsedHrs = elapsedMins / 60;
+
+            let spreadPremiumUnits = 0;
+            let spreadMsg = "";
+
             if (isXB) {
-                let bonusEligible = Math.min(rawSpreadOver, 0.5);
-                spreadPremiumValue = vtaRound(bonusEligible * 0.5);
-                spreadStatus = rawSpreadOver > 0.5 ? "(XB Cap Applied)" : "";
+                // Sec 9.3: XB 10.5-11.0 = 0.5x premium. >11.0 = "Present one-time pay" (Full Hour)
+                if (elapsedHrs > 10.5) {
+                    let firstWindow = Math.min(elapsedHrs, 11) - 10.5;
+                    spreadPremiumUnits += firstWindow * 0.5;
+                    
+                    if (elapsedHrs > 11) {
+                        let secondWindow = elapsedHrs - 11;
+                        spreadPremiumUnits += secondWindow; // 1.0x for everything over 11
+                        spreadMsg = "(XB Step-up applied)";
+                    }
+                }
             } else {
-                spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
+                // Sec 9.1 & 9.2: Regular/Frag Runs get 0.5x for all time over 10.5
+                spreadPremiumUnits = Math.max(0, elapsedHrs - 10.5) * 0.5;
             }
 
+            // 3. Overtime (Daily 8-hour rule)
+            let otPremiumUnits = Math.max(0, workHrs - 8) * 0.5;
+
+            // 4. Final Pay Hours Calculation
             let totalPayHours;
             if (isDayOff) {
-                totalPayHours = vtaRound(((workTotal + travelHrs) * 1.5) + spreadPremiumValue);
+                // Working Day Off = 1.5x everything + Spread Premium
+                totalPayHours = ((workHrs + (travelMins/60)) * 1.5) + spreadPremiumUnits;
             } else {
-                let baseWithGuarantee = Math.max(8, workTotal);
-                totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
+                // Normal Day: Max of (8 or Work) + Travel + OT Prem + Spread Prem
+                let basePlusGuarantee = Math.max(8, workHrs);
+                totalPayHours = basePlusGuarantee + (travelMins/60) + otPremiumUnits + spreadPremiumUnits;
             }
-            
-            let grossPay = totalPayHours * rate;
 
+            // Results Display
             document.getElementById('result').style.display = 'block';
-            document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
-            
+            document.getElementById('total').innerText = `Total Pay: $${(totalPayHours * rate).toFixed(2)}`;
             document.getElementById('audit-details').innerHTML = 
-                `Work Time: ${workTotal.toFixed(2)} hrs<br>` +
-                `Spread Span: ${adjustedSpan.toFixed(2)} hrs<br>` +
+                `Base Work: ${workHrs.toFixed(2)} hrs (Incl. ${reportMins}m Report/${turnInMins}m Turn-in)<br>` +
+                `Elapsed (Spread): ${elapsedHrs.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
-                `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
-                `Spread Prem (0.5x): ${spreadPremiumValue.toFixed(2)} units ${spreadStatus}<br>` +
+                `OT Premium (0.5x): ${otPremiumUnits.toFixed(2)} units<br>` +
+                `Spread Premium: ${spreadPremiumUnits.toFixed(2)} units ${spreadMsg}<br>` +
+                `Travel: ${(travelMins/60).toFixed(2)} hrs (Straight Time)<br>` +
                 `-----------------------<br>` +
                 `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
         }
