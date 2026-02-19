@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VTA Pay Auditor</title>
+    
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -24,39 +25,50 @@
 </head>
 <body>
     <div class="card">
-        <div class="logo-container"><img src="icon.png" alt="App Icon"></div>
+        <div class="logo-container">
+            <img src="icon.png" alt="App Icon">
+        </div>
+        
         <h2>VTA Pay Auditor</h2>
         <label>Hourly Rate ($)</label>
         <input type="number" id="rate" value="45.00" step="0.01">
+        
         <hr style="margin-top:20px; border: 0; border-top: 1px solid #eee;">
+        
         <div class="toggle-box">
             <div class="row">
                 <input type="checkbox" id="isExtraBoard" checked> 
                 <span style="font-weight:bold;">Extra Board Operator?</span>
             </div>
-            <span class="mini-label">(Adjusts spread premium per Sec 9.3)</span>
+            <span class="mini-label">(Caps spread bonus at 30 mins per Sec 9.3)</span>
         </div>
+
         <label>Piece 1</label>
         <span class="mini-label">Report Time (Mins)</span>
         <input type="number" id="r1" value="15">
         <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
+        
         <label>Piece 2</label>
         <span class="mini-label">Report Time (Mins)</span>
         <input type="number" id="r2" value="0">
         <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
+
         <label>Travel Time (Total Mins)</label>
         <input type="number" id="travel" value="0">
+
         <div class="day-off-row">
             <div class="row">
                 <input type="checkbox" id="isDayOff"> 
                 <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF?</span>
             </div>
         </div>
+
         <button onclick="calculate()">Audit Pay Now</button>
+
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
             <div class="audit">
@@ -64,12 +76,18 @@
                 <span id="audit-details"></span>
             </div>
         </div>
-        <div class="disclaimer">Unofficial tool based on 2025-2029 Contract.</div>
+
+        <div class="disclaimer">
+            Unofficial tool based on 2025-2029 Contract.
+        </div>
     </div>
 
     <script>
-        function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
-        function vtaRound(value) { return Math.ceil(value * 100) / 100; }
+        function getMinutes(t) { if(!t || t==="") return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+
+        function vtaRound(value) {
+            return Math.ceil(value * 100) / 100;
+        }
 
         function calculate() {
             const rate = parseFloat(document.getElementById('rate').value);
@@ -77,6 +95,7 @@
             let s1_e = getMinutes(document.getElementById('s1_end').value);
             let s2_s = getMinutes(document.getElementById('s2_start').value);
             let s2_e = getMinutes(document.getElementById('s2_end').value);
+            
             const r1 = parseFloat(document.getElementById('r1').value) || 0;
             const r2 = parseFloat(document.getElementById('r2').value) || 0;
             const travelMins = parseFloat(document.getElementById('travel').value) || 0;
@@ -84,58 +103,66 @@
             const isXB = document.getElementById('isExtraBoard').checked;
 
             if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
+
             if (s1_e < s1_s) s1_e += 1440; 
             if (s2_s !== null && s2_e !== null) {
                 if (s2_s < s1_e) s2_s += 1440; 
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // WORK TIME (PLATFORM ONLY for SOT)
-            let platformHrs = ((s1_e - s1_s) + ((s2_s !== null) ? (s2_e - s2_s) : 0)) / 60;
-            let reportHrs = (r1 + r2) / 60;
+            // BUCKET 1: PLATFORM TIME (DRIVING ONLY)
+            let p1 = s1_e - s1_s;
+            let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
+            let platformHrs = (p1 + p2) / 60;
+
+            // BUCKET 2: REPORT TIME (ISOLATED FLAT RATE)
+            let isolatedReportHrs = (r1 + r2) / 60;
+            
             let travelHrs = travelMins / 60;
 
-            // OVERTIME (Based on Platform + Turn-in, typically excludes Report per Sec 10)
-            let workTotalForOT = platformHrs; 
-            let otPremiumValue = vtaRound(Math.max(0, (workTotalForOT + 0.25) - 8) * 0.5); // 0.25 is Turn-in estimate
+            // OT CLOCK (Uses Platform ONLY)
+            let rawOTOver = Math.max(0, platformHrs - 8);
+            let otPremiumValue = vtaRound(rawOTOver * 0.5);
 
-            // SPREAD (Sec 9.3: Excludes report, travel, and turn-in)
-            let elapsedHrs = (s2_s !== null ? (s2_e - s1_s) : (s1_e - s1_s)) / 60;
-            let spreadPremiumValue = 0;
-
+            // SPREAD CLOCK (Uses Platform ONLY)
+            let totalSpanHrs = (s2_s !== null && s2_e !== null ? (s2_e - s1_s) : (s1_e - s1_s)) / 60;
+            let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
+            
+            let spreadPremiumValue;
+            let spreadStatus = "";
             if (isXB) {
-                if (elapsedHrs > 10.5) {
-                    let window1 = Math.min(elapsedHrs, 11) - 10.5;
-                    spreadPremiumValue += vtaRound(window1 * 0.5); // 0.5x for 10.5-11
-                    if (elapsedHrs > 11) {
-                        spreadPremiumValue += vtaRound(elapsedHrs - 11); // 1.0x for > 11
-                    }
-                }
+                let bonusEligible = Math.min(rawSpreadOver, 0.5);
+                spreadPremiumValue = vtaRound(bonusEligible * 0.5);
+                spreadStatus = rawSpreadOver > 0.5 ? "(XB Cap Applied)" : "";
             } else {
-                spreadPremiumValue = vtaRound(Math.max(0, elapsedHrs - 10.5) * 0.5);
+                spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
             }
 
-            // TOTAL PAY
+            // FINAL CALCULATION
             let totalPayHours;
-            let totalWork = platformHrs + reportHrs;
             if (isDayOff) {
-                totalPayHours = vtaRound(((totalWork + travelHrs) * 1.5) + spreadPremiumValue);
+                // Day off treats everything at 1.5x + Spread
+                totalPayHours = vtaRound(((platformHrs + isolatedReportHrs + travelHrs) * 1.5) + spreadPremiumValue);
             } else {
-                let baseGuarantee = Math.max(8, totalWork);
-                totalPayHours = vtaRound(baseGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
+                // Normal day: 8hr Guarantee on Platform+Report, then add premiums
+                let baseWithGuarantee = Math.max(8, (platformHrs + isolatedReportHrs));
+                totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
             }
+            
+            let grossPay = totalPayHours * rate;
 
             document.getElementById('result').style.display = 'block';
-            document.getElementById('total').innerText = `Total Pay: $${(totalPayHours * rate).toFixed(2)}`;
+            document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
+            
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)} hrs<br>` +
-                `Spread Clock: ${elapsedHrs.toFixed(2)} hrs<br>` +
+                `Spread Span: ${totalSpanHrs.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
                 `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
-                `Spread Prem: ${spreadPremiumValue.toFixed(2)} units<br>` +
+                `Spread Prem (0.5x): ${spreadPremiumValue.toFixed(2)} units ${spreadStatus}<br>` +
                 `Travel (Straight): ${travelHrs.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
-                `Report Time (RPT): ${reportHrs.toFixed(2)} hrs<br>` +
+                `<strong>Report Time (Flat): ${isolatedReportHrs.toFixed(2)} hrs</strong><br>` +
                 `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
         }
     </script>
