@@ -8,8 +8,7 @@
 </head>
 <body class="bg-gray-100 p-4">
     <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
-        <h2 class="text-2xl font-bold text-center text-blue-800">Pay Auditor</h2>
-        <p class="text-center text-xs text-gray-500 mb-6 italic border-b pb-2">Unofficial Tool - Independent Audit</p>
+        <h2 class="text-2xl font-bold text-center mb-6">Pay Auditor</h2>
 
         <div class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
@@ -18,49 +17,40 @@
             </div>
 
             <div class="border p-3 rounded-lg bg-gray-50">
-                <h3 class="font-bold mb-2 text-sm uppercase">Part 1 (Pull-out / Point)</h3>
+                <h3 class="font-bold mb-2 text-sm uppercase">Part 1</h3>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block text-xs">Report Time</label>
+                        <label class="block text-xs">Start Time</label>
                         <input type="time" id="start1" class="w-full border p-2 rounded">
                     </div>
                     <div>
-                        <label class="block text-xs">End Part 1</label>
+                        <label class="block text-xs">End Time</label>
                         <input type="time" id="end1" class="w-full border p-2 rounded">
                     </div>
                 </div>
             </div>
 
             <div class="border p-3 rounded-lg bg-gray-50">
-                <h3 class="font-bold mb-2 text-sm uppercase">Part 2 (Relief / Pull-in)</h3>
+                <h3 class="font-bold mb-2 text-sm uppercase">Part 2</h3>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block text-xs">Start Part 2</label>
+                        <label class="block text-xs">Start Time</label>
                         <input type="time" id="start2" class="w-full border p-2 rounded">
                     </div>
                     <div>
-                        <label class="block text-xs">Final Pull-in</label>
+                        <label class="block text-xs">End Time</label>
                         <input type="time" id="end2" class="w-full border p-2 rounded">
                     </div>
                 </div>
             </div>
 
-            <button onclick="calculatePay()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Calculate Audit</button>
+            <button onclick="calculatePay()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Calculate</button>
 
-            <div id="results" class="mt-4 p-4 bg-yellow-50 rounded-lg hidden">
-                <h3 class="font-bold border-b border-yellow-200 mb-2">Audit Breakdown</h3>
-                <div class="space-y-1 text-sm">
-                    <div class="flex justify-between"><span>Work Time (PLL/RPT):</span> <span id="workOut">0.00</span></div>
-                    <div class="flex justify-between"><span>Scheduled OT (SOT):</span> <span id="otOut">0.00</span></div>
-                    <div class="flex justify-between font-bold text-blue-800">
-                        <span>Spread Premium (SPR):</span> 
-                        <span id="spreadOut">0.00</span>
-                    </div>
-                    <div class="flex justify-between border-t border-yellow-300 mt-2 pt-2 text-lg font-black">
-                        <span>Total Pay Units:</span> <span id="totalOut">0.00</span>
-                    </div>
-                </div>
-                <p id="xbNote" class="text-[10px] text-red-600 mt-2 hidden">*Extra Board 30-min Spread Cap Applied</p>
+            <div id="results" class="mt-4 p-4 bg-yellow-50 rounded-lg hidden text-sm space-y-2">
+                <div class="flex justify-between border-b pb-1"><span>Work (PLL):</span> <span id="workOut" class="font-mono">0.00</span></div>
+                <div class="flex justify-between border-b pb-1"><span>Overtime (SOT):</span> <span id="otOut" class="font-mono">0.00</span></div>
+                <div class="flex justify-between border-b pb-1"><span>Spread (SPR):</span> <span id="spreadOut" class="font-mono">0.00</span></div>
+                <div class="flex justify-between pt-2 text-lg font-bold"><span>Total Units:</span> <span id="totalOut">0.00</span></div>
             </div>
         </div>
     </div>
@@ -79,35 +69,25 @@
             const s2 = toDecimal(document.getElementById('start2').value);
             const e2 = toDecimal(document.getElementById('end2').value);
 
-            // 1. Work Time Calculation
             let piece1 = e1 > s1 ? e1 - s1 : (e1 + 24) - s1;
             let piece2 = e2 > s2 ? e2 - s2 : (e2 + 24) - s2;
             let actualWork = piece1 + piece2;
 
-            // 2. 8-Hour Guarantee Math
             let workPay = Math.max(8, actualWork);
             let sot = Math.max(0, actualWork - 8);
 
-            // 3. Spread Calculation (Total Span)
             let totalSpan = e2 > s1 ? e2 - s1 : (e2 + 24) - s1;
-            
-            // Section 10: Subtract initial report time (0.25) from spread calc
             let adjustedSpan = totalSpan - 0.25;
             let spreadPremium = 0;
 
             if (adjustedSpan > 10.5) {
                 let spreadTime = adjustedSpan - 10.5;
                 if (isXB) {
-                    // Section 9.3: Extra Board Cap at 30 mins
                     spreadTime = Math.min(0.5, spreadTime);
-                    document.getElementById('xbNote').classList.remove('hidden');
-                } else {
-                    document.getElementById('xbNote').classList.add('hidden');
                 }
                 spreadPremium = spreadTime * 0.5;
             }
 
-            // Display
             document.getElementById('workOut').innerText = workPay.toFixed(2);
             document.getElementById('otOut').innerText = (sot * 0.5).toFixed(2);
             document.getElementById('spreadOut').innerText = spreadPremium.toFixed(2);
