@@ -4,103 +4,162 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pay Auditor</title>
+    
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
+        .logo-container { text-align: center; margin-bottom: 10px; }
+        .logo-container img { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; }
         h2 { text-align: center; color: #00529b; margin-top: 0; }
         label { font-weight: bold; display: block; margin-top: 15px; }
-        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
         .toggle-box { padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; background: #fff; }
+        .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
         button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
         .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
+        .mini-label { font-size: 0.8em; color: #666; margin-top: 4px; display: block; }
+        .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>VTA Pay Auditor</h2>
+        <div class="logo-container">
+            <img src="icon.png" alt="App Icon">
+        </div>
+        
+        <h2>Pay Auditor</h2>
         <label>Hourly Rate ($)</label>
-        <input type="number" id="rate" placeholder="0.00">
+        <input type="number" id="rate" value="45.00" step="0.01">
+        
+        <hr style="margin-top:20px; border: 0; border-top: 1px solid #eee;">
         
         <div class="toggle-box">
             <div class="row">
-                <input type="checkbox" id="isExtraBoard"> 
-                <span>Extra Board Operator?</span>
+                <input type="checkbox" id="isExtraBoard" checked> 
+                <span style="font-weight:bold;">Extra Board Operator?</span>
             </div>
+            <span class="mini-label">(Sec 9.3: 1.0x step-up after 11h spread)</span>
         </div>
 
         <label>Piece 1</label>
+        <span class="mini-label">Report Time (Mins)</span>
+        <input type="number" id="r1" value="0">
+        <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s1_start">
         <input type="time" id="s1_end">
         
         <label>Piece 2</label>
+        <span class="mini-label">Report Time (Mins)</span>
+        <input type="number" id="r2" value="0">
+        <span class="mini-label">Drive Start & End</span>
         <input type="time" id="s2_start">
         <input type="time" id="s2_end">
 
-        <label>Travel Time (Mins)</label>
-        <input type="number" id="travel" placeholder="0">
+        <label>Travel Time (Total Mins)</label>
+        <input type="number" id="travel" value="0">
+
+        <div class="day-off-row">
+            <div class="row">
+                <input type="checkbox" id="isDayOff"> 
+                <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF?</span>
+            </div>
+        </div>
 
         <button onclick="calculate()">Audit Pay Now</button>
 
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
-            <div class="audit" id="audit-details"></div>
+            <div class="audit">
+                <strong>CONTRACT AUDIT:</strong><br>
+                <span id="audit-details"></span>
+            </div>
+        </div>
+
+        <div class="disclaimer">
+            Unofficial tool based on 2025-2029 Contract.
         </div>
     </div>
 
     <script>
         function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
-        function vtaRound(v) { return Math.ceil(v * 100) / 100; }
+
+        function vtaRound(value) {
+            return Math.ceil(value * 100) / 100;
+        }
 
         function calculate() {
-            const rate = parseFloat(document.getElementById('rate').value) || 0;
+            const rate = parseFloat(document.getElementById('rate').value);
             let s1_s = getMinutes(document.getElementById('s1_start').value);
             let s1_e = getMinutes(document.getElementById('s1_end').value);
             let s2_s = getMinutes(document.getElementById('s2_start').value);
             let s2_e = getMinutes(document.getElementById('s2_end').value);
-            const travelHrs = (parseFloat(document.getElementById('travel').value) || 0) / 60;
+            
+            const r1 = parseFloat(document.getElementById('r1').value) || 0;
+            const r2 = parseFloat(document.getElementById('r2').value) || 0;
+            const travelMins = parseFloat(document.getElementById('travel').value) || 0;
+            const isDayOff = document.getElementById('isDayOff').checked;
             const isXB = document.getElementById('isExtraBoard').checked;
 
-            if (!s1_s || !s1_e) return alert("Please enter drive times.");
+            if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
 
-            // 1. Platform Calculation
-            let p1 = (s1_e < s1_s) ? (s1_e + 1440 - s1_s) : (s1_e - s1_s);
-            let p2 = (s2_s && s2_e) ? ((s2_e < s2_s) ? (s2_e + 1440 - s2_s) : (s2_e - s2_s)) : 0;
-            let platformHrs = (p1 + p2) / 60;
-
-            // 2. Report Time (Isolated 15 mins)
-            let reportHrs = 0.25; 
-
-            // 3. SOT-OPER Calculation (Platform + Report - 8)
-            let totalWork = platformHrs + reportHrs; // The 15 mins is included here for the OT trigger
-            let sotUnits = vtaRound(Math.max(0, totalWork - 8));
-
-            // 4. SPR-OPER Calculation
-            let endOfSpan = s2_e ? s2_e : s1_e;
-            let spanHrs = ((endOfSpan < s1_s) ? (endOfSpan + 1440 - s1_s) : (endOfSpan - s1_s)) / 60;
-            let rawSpread = Math.max(0, spanHrs - 10.5);
-            let spreadPay = 0;
-            
-            if (isXB) {
-                spreadPay += vtaRound(Math.min(rawSpread, 0.5) * 0.5);
-                if (rawSpread > 0.5) spreadPay += vtaRound((rawSpread - 0.5) * 1.0);
-            } else {
-                spreadPay = vtaRound(rawSpread * 0.5);
+            if (s1_e < s1_s) s1_e += 1440; 
+            if (s2_s !== null && s2_e !== null) {
+                if (s2_s < s1_e) s2_s += 1440; 
+                if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            let totalPayHrs = vtaRound(8 + sotUnits + spreadPay + travelHrs + reportHrs);
+            let platformHrs = ((s1_e - s1_s) + ((s2_s !== null) ? (s2_e - s2_s) : 0)) / 60;
+            let reportHrs = (r1 + r2) / 60;
+            let travelHrs = travelMins / 60;
+            let workTotal = platformHrs + reportHrs;
             
+            let rawOTOver = Math.max(0, workTotal - 8);
+            let otPremiumValue = vtaRound(rawOTOver * 0.5);
+
+            let firstStart = s1_s - r1; 
+            let lastEnd = (s2_s !== null ? s2_e : s1_e);
+            let totalSpanHrs = (lastEnd - firstStart) / 60;
+            
+            let adjustedSpan = totalSpanHrs - reportHrs;
+            let rawSpreadOver = Math.max(0, adjustedSpan - 10.5);
+            
+            let spreadPremiumValue = 0;
+            if (isXB) {
+                // First 30 mins (10.5h to 11h) @ 0.5x
+                let halfTimeWindow = Math.min(rawSpreadOver, 0.5);
+                spreadPremiumValue += vtaRound(halfTimeWindow * 0.5);
+                // After 11h @ 1.0x
+                if (rawSpreadOver > 0.5) {
+                    spreadPremiumValue += vtaRound((rawSpreadOver - 0.5) * 1.0);
+                }
+            } else {
+                spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
+            }
+
+            let totalPayHours;
+            if (isDayOff) {
+                totalPayHours = vtaRound(((workTotal + travelHrs) * 1.5) + spreadPremiumValue);
+            } else {
+                let baseWithGuarantee = Math.max(8, workTotal);
+                totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
+            }
+            
+            let grossPay = totalPayHours * rate;
+
             document.getElementById('result').style.display = 'block';
-            document.getElementById('total').innerText = `Total Pay: $${(totalPayHrs * rate).toFixed(2)}`;
+            document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
+            
             document.getElementById('audit-details').innerHTML = 
-                `PLL-OPER (Platform): ${platformHrs.toFixed(2)} hrs<br>` +
-                `SOT-OPER (Overtime): ${sotUnits.toFixed(2)} units<br>` +
-                `SPR-OPER (Spread): ${spreadPay.toFixed(2)} units<br>` +
-                `TRV-OPR (Travel): ${travelHrs.toFixed(2)} hrs<br>` +
-                `RPT-OPER (Report): ${reportHrs.toFixed(2)} hrs<br>` +
+                `Platform Time: ${platformHrs.toFixed(2)} hrs<br>` +
+                `Report Time: ${reportHrs.toFixed(2)} hrs<br>` +
+                `Spread Span: ${adjustedSpan.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
-                `<strong>TOTAL PAY HOURS: ${totalPayHrs.toFixed(2)}</strong>`;
+                `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
+                `Spread Prem: ${spreadPremiumValue.toFixed(2)} units<br>` +
+                `-----------------------<br>` +
+                `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
         }
     </script>
 </body>
