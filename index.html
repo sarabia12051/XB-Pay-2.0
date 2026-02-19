@@ -59,3 +59,85 @@
         <button onclick="calculate()">Audit Pay Now</button>
         <div id="result" class="result">
             <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
+            <div class="audit">
+                <strong>CONTRACT AUDIT:</strong><br>
+                <span id="audit-details"></span>
+            </div>
+        </div>
+        <div class="disclaimer">Unofficial tool based on 2025-2029 Contract.</div>
+    </div>
+
+    <script>
+        function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+        function vtaRound(value) { return Math.ceil(value * 100) / 100; }
+
+        function calculate() {
+            const rate = parseFloat(document.getElementById('rate').value);
+            let s1_s = getMinutes(document.getElementById('s1_start').value);
+            let s1_e = getMinutes(document.getElementById('s1_end').value);
+            let s2_s = getMinutes(document.getElementById('s2_start').value);
+            let s2_e = getMinutes(document.getElementById('s2_end').value);
+            const r1 = parseFloat(document.getElementById('r1').value) || 0;
+            const r2 = parseFloat(document.getElementById('r2').value) || 0;
+            const travelMins = parseFloat(document.getElementById('travel').value) || 0;
+            const isDayOff = document.getElementById('isDayOff').checked;
+            const isXB = document.getElementById('isExtraBoard').checked;
+
+            if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
+            if (s1_e < s1_s) s1_e += 1440; 
+            if (s2_s !== null && s2_e !== null) {
+                if (s2_s < s1_e) s2_s += 1440; 
+                if (s2_e < s2_s) s2_e += 1440; 
+            }
+
+            // WORK TIME (PLATFORM ONLY for SOT)
+            let platformHrs = ((s1_e - s1_s) + ((s2_s !== null) ? (s2_e - s2_s) : 0)) / 60;
+            let reportHrs = (r1 + r2) / 60;
+            let travelHrs = travelMins / 60;
+
+            // OVERTIME (Based on Platform + Turn-in, typically excludes Report per Sec 10)
+            let workTotalForOT = platformHrs; 
+            let otPremiumValue = vtaRound(Math.max(0, (workTotalForOT + 0.25) - 8) * 0.5); // 0.25 is Turn-in estimate
+
+            // SPREAD (Sec 9.3: Excludes report, travel, and turn-in)
+            let elapsedHrs = (s2_s !== null ? (s2_e - s1_s) : (s1_e - s1_s)) / 60;
+            let spreadPremiumValue = 0;
+
+            if (isXB) {
+                if (elapsedHrs > 10.5) {
+                    let window1 = Math.min(elapsedHrs, 11) - 10.5;
+                    spreadPremiumValue += vtaRound(window1 * 0.5); // 0.5x for 10.5-11
+                    if (elapsedHrs > 11) {
+                        spreadPremiumValue += vtaRound(elapsedHrs - 11); // 1.0x for > 11
+                    }
+                }
+            } else {
+                spreadPremiumValue = vtaRound(Math.max(0, elapsedHrs - 10.5) * 0.5);
+            }
+
+            // TOTAL PAY
+            let totalPayHours;
+            let totalWork = platformHrs + reportHrs;
+            if (isDayOff) {
+                totalPayHours = vtaRound(((totalWork + travelHrs) * 1.5) + spreadPremiumValue);
+            } else {
+                let baseGuarantee = Math.max(8, totalWork);
+                totalPayHours = vtaRound(baseGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
+            }
+
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('total').innerText = `Total Pay: $${(totalPayHours * rate).toFixed(2)}`;
+            document.getElementById('audit-details').innerHTML = 
+                `Platform Time: ${platformHrs.toFixed(2)} hrs<br>` +
+                `Spread Clock: ${elapsedHrs.toFixed(2)} hrs<br>` +
+                `-----------------------<br>` +
+                `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
+                `Spread Prem: ${spreadPremiumValue.toFixed(2)} units<br>` +
+                `Travel (Straight): ${travelHrs.toFixed(2)} hrs<br>` +
+                `-----------------------<br>` +
+                `Report Time (RPT): ${reportHrs.toFixed(2)} hrs<br>` +
+                `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
+        }
+    </script>
+</body>
+</html>
