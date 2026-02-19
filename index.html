@@ -3,161 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VTA Pay Auditor</title>
-    
-    <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
-        .logo-container { text-align: center; margin-bottom: 10px; }
-        .logo-container img { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; }
-        h2 { text-align: center; color: #00529b; margin-top: 0; }
-        label { font-weight: bold; display: block; margin-top: 15px; }
-        input[type="time"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        .row { display: flex; align-items: center; margin-top: 8px; gap: 10px; font-size: 0.9em; }
-        .toggle-box { padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; background: #fff; }
-        .day-off-row { background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #feb2b2; margin-top: 15px; }
-        button { width: 100%; padding: 15px; background-color: #00529b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-        .result { margin-top: 25px; padding: 15px; background-color: #eef6ff; border-radius: 8px; display: none; border-left: 5px solid #00529b; }
-        .audit { margin-top: 15px; padding: 10px; background-color: #fff; border: 1px dashed #00529b; border-radius: 6px; font-family: monospace; font-size: 0.85em; line-height: 1.4; }
-        .mini-label { font-size: 0.8em; color: #666; margin-top: 4px; display: block; }
-        .disclaimer { text-align: center; font-size: 0.75em; color: #888; margin-top: 20px; font-style: italic; }
-    </style>
+    <title>Pay Auditor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div class="card">
-        <div class="logo-container">
-            <img src="icon.png" alt="App Icon">
-        </div>
-        
-        <h2>VTA Pay Auditor</h2>
-        <label>Hourly Rate ($)</label>
-        <input type="number" id="rate" value="45.00" step="0.01">
-        
-        <hr style="margin-top:20px; border: 0; border-top: 1px solid #eee;">
-        
-        <div class="toggle-box">
-            <div class="row">
-                <input type="checkbox" id="isExtraBoard" checked> 
-                <span style="font-weight:bold;">Extra Board Operator?</span>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+        <h2 class="text-2xl font-bold text-center text-blue-800">Pay Auditor</h2>
+        <p class="text-center text-xs text-gray-500 mb-6 italic border-b pb-2">Unofficial Tool - Independent Audit</p>
+
+        <div class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <span class="font-semibold text-blue-900">Extra Board Operator?</span>
+                <input type="checkbox" id="isXB" class="w-6 h-6">
             </div>
-            <span class="mini-label">(Caps spread bonus at 30 mins per Sec 9.3)</span>
-        </div>
 
-        <label>Piece 1</label>
-        <span class="mini-label">Report Time (Mins)</span>
-        <input type="number" id="r1" value="0">
-        <span class="mini-label">Drive Start & End</span>
-        <input type="time" id="s1_start">
-        <input type="time" id="s1_end">
-        
-        <label>Piece 2</label>
-        <span class="mini-label">Report Time (Mins)</span>
-        <input type="number" id="r2" value="0">
-        <span class="mini-label">Drive Start & End</span>
-        <input type="time" id="s2_start">
-        <input type="time" id="s2_end">
-
-        <label>Travel Time (Total Mins)</label>
-        <input type="number" id="travel" value="0">
-
-        <div class="day-off-row">
-            <div class="row">
-                <input type="checkbox" id="isDayOff"> 
-                <span style="color: #c53030; font-weight: bold;">WORKING DAY OFF?</span>
+            <div class="border p-3 rounded-lg bg-gray-50">
+                <h3 class="font-bold mb-2 text-sm uppercase">Part 1 (Pull-out / Point)</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs">Report Time</label>
+                        <input type="time" id="start1" class="w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-xs">End Part 1</label>
+                        <input type="time" id="end1" class="w-full border p-2 rounded">
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <button onclick="calculate()">Audit Pay Now</button>
-
-        <div id="result" class="result">
-            <div id="total" style="font-size: 1.4em; font-weight: bold; color: #00529b;"></div>
-            <div class="audit">
-                <strong>CONTRACT AUDIT:</strong><br>
-                <span id="audit-details"></span>
+            <div class="border p-3 rounded-lg bg-gray-50">
+                <h3 class="font-bold mb-2 text-sm uppercase">Part 2 (Relief / Pull-in)</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs">Start Part 2</label>
+                        <input type="time" id="start2" class="w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-xs">Final Pull-in</label>
+                        <input type="time" id="end2" class="w-full border p-2 rounded">
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="disclaimer">
-            Unofficial tool based on 2025-2029 Contract.
+            <button onclick="calculatePay()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Calculate Audit</button>
+
+            <div id="results" class="mt-4 p-4 bg-yellow-50 rounded-lg hidden">
+                <h3 class="font-bold border-b border-yellow-200 mb-2">Audit Breakdown</h3>
+                <div class="space-y-1 text-sm">
+                    <div class="flex justify-between"><span>Work Time (PLL/RPT):</span> <span id="workOut">0.00</span></div>
+                    <div class="flex justify-between"><span>Scheduled OT (SOT):</span> <span id="otOut">0.00</span></div>
+                    <div class="flex justify-between font-bold text-blue-800">
+                        <span>Spread Premium (SPR):</span> 
+                        <span id="spreadOut">0.00</span>
+                    </div>
+                    <div class="flex justify-between border-t border-yellow-300 mt-2 pt-2 text-lg font-black">
+                        <span>Total Pay Units:</span> <span id="totalOut">0.00</span>
+                    </div>
+                </div>
+                <p id="xbNote" class="text-[10px] text-red-600 mt-2 hidden">*Extra Board 30-min Spread Cap Applied</p>
+            </div>
         </div>
     </div>
 
     <script>
-        function getMinutes(t) { if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
-
-        function vtaRound(value) {
-            return Math.ceil(value * 100) / 100;
+        function toDecimal(timeStr) {
+            if (!timeStr) return 0;
+            const [hrs, mins] = timeStr.split(':').map(Number);
+            return hrs + (mins / 60);
         }
 
-        function calculate() {
-            const rate = parseFloat(document.getElementById('rate').value);
-            let s1_s = getMinutes(document.getElementById('s1_start').value);
-            let s1_e = getMinutes(document.getElementById('s1_end').value);
-            let s2_s = getMinutes(document.getElementById('s2_start').value);
-            let s2_e = getMinutes(document.getElementById('s2_end').value);
+        function calculatePay() {
+            const isXB = document.getElementById('isXB').checked;
+            const s1 = toDecimal(document.getElementById('start1').value);
+            const e1 = toDecimal(document.getElementById('end1').value);
+            const s2 = toDecimal(document.getElementById('start2').value);
+            const e2 = toDecimal(document.getElementById('end2').value);
+
+            // 1. Work Time Calculation
+            let piece1 = e1 > s1 ? e1 - s1 : (e1 + 24) - s1;
+            let piece2 = e2 > s2 ? e2 - s2 : (e2 + 24) - s2;
+            let actualWork = piece1 + piece2;
+
+            // 2. 8-Hour Guarantee Math
+            let workPay = Math.max(8, actualWork);
+            let sot = Math.max(0, actualWork - 8);
+
+            // 3. Spread Calculation (Total Span)
+            let totalSpan = e2 > s1 ? e2 - s1 : (e2 + 24) - s1;
             
-            const r1 = parseFloat(document.getElementById('r1').value) || 0;
-            const r2 = parseFloat(document.getElementById('r2').value) || 0;
-            const travelMins = parseFloat(document.getElementById('travel').value) || 0;
-            const isDayOff = document.getElementById('isDayOff').checked;
-            const isXB = document.getElementById('isExtraBoard').checked;
+            // Section 10: Subtract initial report time (0.25) from spread calc
+            let adjustedSpan = totalSpan - 0.25;
+            let spreadPremium = 0;
 
-            if (s1_s === null || s1_e === null) return alert("Enter Piece 1 times");
-
-            if (s1_e < s1_s) s1_e += 1440; 
-            if (s2_s !== null && s2_e !== null) {
-                if (s2_s < s1_e) s2_s += 1440; 
-                if (s2_e < s2_s) s2_e += 1440; 
+            if (adjustedSpan > 10.5) {
+                let spreadTime = adjustedSpan - 10.5;
+                if (isXB) {
+                    // Section 9.3: Extra Board Cap at 30 mins
+                    spreadTime = Math.min(0.5, spreadTime);
+                    document.getElementById('xbNote').classList.remove('hidden');
+                } else {
+                    document.getElementById('xbNote').classList.add('hidden');
+                }
+                spreadPremium = spreadTime * 0.5;
             }
 
-            let p1 = s1_e - s1_s;
-            let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
-            let platformHrs = (p1 + p2) / 60;
-            let reportHrs = (r1 + r2) / 60;
-            let travelHrs = travelMins / 60;
-            let workTotal = platformHrs + reportHrs;
-            
-            let rawOTOver = Math.max(0, workTotal - 8);
-            let otPremiumValue = vtaRound(rawOTOver * 0.5);
-
-            let firstStart = s1_s - r1; 
-            let lastEnd = (s2_s !== null ? s2_e : s1_e);
-            let totalSpanHrs = (lastEnd - firstStart) / 60;
-            
-            let adjustedSpan = totalSpanHrs - reportHrs;
-            let rawSpreadOver = Math.max(0, adjustedSpan - 10.5);
-            
-            let spreadPremiumValue;
-            let spreadStatus = "";
-            if (isXB) {
-                let bonusEligible = Math.min(rawSpreadOver, 0.5);
-                spreadPremiumValue = vtaRound(bonusEligible * 0.5);
-                spreadStatus = rawSpreadOver > 0.5 ? "(XB Cap Applied)" : "";
-            } else {
-                spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
-            }
-
-            let totalPayHours;
-            if (isDayOff) {
-                totalPayHours = vtaRound(((workTotal + travelHrs) * 1.5) + spreadPremiumValue);
-            } else {
-                let baseWithGuarantee = Math.max(8, workTotal);
-                totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
-            }
-            
-            let grossPay = totalPayHours * rate;
-
-            document.getElementById('result').style.display = 'block';
-            document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
-            
-            document.getElementById('audit-details').innerHTML = 
-                `Work Time: ${workTotal.toFixed(2)} hrs<br>` +
-                `Spread Span: ${adjustedSpan.toFixed(2)} hrs<br>` +
-                `-----------------------<br>` +
-                `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
-                `Spread Prem (0.5x): ${spreadPremiumValue.toFixed(2)} units ${spreadStatus}<br>` +
-                `-----------------------<br>` +
-                `<strong>Total Pay Hours: ${totalPayHours.toFixed(2)}</strong>`;
+            // Display
+            document.getElementById('workOut').innerText = workPay.toFixed(2);
+            document.getElementById('otOut').innerText = (sot * 0.5).toFixed(2);
+            document.getElementById('spreadOut').innerText = spreadPremium.toFixed(2);
+            document.getElementById('totalOut').innerText = (workPay + (sot * 0.5) + spreadPremium).toFixed(2);
+            document.getElementById('results').classList.remove('hidden');
         }
     </script>
 </body>
