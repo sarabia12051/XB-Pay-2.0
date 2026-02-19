@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VTA Pay Auditor</title>
+    <title>Pay Auditor</title>
     
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
@@ -40,7 +40,7 @@
                 <input type="checkbox" id="isExtraBoard" checked> 
                 <span style="font-weight:bold;">Extra Board Operator?</span>
             </div>
-            <span class="mini-label">(Caps spread bonus at 30 mins per Sec 9.3)</span>
+            <span class="mini-label">(Sec 9.3: 1.0x Step-up after 11th hour)</span>
         </div>
 
         <label>Piece 1</label>
@@ -110,41 +110,39 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // BUCKET 1: PLATFORM TIME (DRIVING ONLY)
             let p1 = s1_e - s1_s;
             let p2 = (s2_s !== null && s2_e !== null) ? (s2_e - s2_s) : 0;
             let platformHrs = (p1 + p2) / 60;
 
-            // BUCKET 2: REPORT TIME (ISOLATED FLAT RATE)
             let isolatedReportHrs = (r1 + r2) / 60;
-            
             let travelHrs = travelMins / 60;
 
-            // OT CLOCK (Uses Platform ONLY)
             let rawOTOver = Math.max(0, platformHrs - 8);
             let otPremiumValue = vtaRound(rawOTOver * 0.5);
 
-            // SPREAD CLOCK (Uses Platform ONLY)
             let totalSpanHrs = (s2_s !== null && s2_e !== null ? (s2_e - s1_s) : (s1_e - s1_s)) / 60;
             let rawSpreadOver = Math.max(0, totalSpanHrs - 10.5);
             
-            let spreadPremiumValue;
-            let spreadStatus = "";
+            let spreadPremiumValue = 0;
+            let xbStepUpValue = 0;
+
             if (isXB) {
-                let bonusEligible = Math.min(rawSpreadOver, 0.5);
-                spreadPremiumValue = vtaRound(bonusEligible * 0.5);
-                spreadStatus = rawSpreadOver > 0.5 ? "(XB Cap Applied)" : "";
+                // Section 9.3: 0.5x for first 30 mins, 1.0x after hour 11
+                let halfTimeWindow = Math.min(rawSpreadOver, 0.5);
+                spreadPremiumValue += vtaRound(halfTimeWindow * 0.5);
+                
+                if (rawSpreadOver > 0.5) {
+                    xbStepUpValue = vtaRound((rawSpreadOver - 0.5) * 1.0);
+                    spreadPremiumValue += xbStepUpValue;
+                }
             } else {
                 spreadPremiumValue = vtaRound(rawSpreadOver * 0.5);
             }
 
-            // FINAL CALCULATION
             let totalPayHours;
             if (isDayOff) {
-                // Day off treats everything at 1.5x + Spread
                 totalPayHours = vtaRound(((platformHrs + isolatedReportHrs + travelHrs) * 1.5) + spreadPremiumValue);
             } else {
-                // Normal day: 8hr Guarantee on Platform+Report, then add premiums
                 let baseWithGuarantee = Math.max(8, (platformHrs + isolatedReportHrs));
                 totalPayHours = vtaRound(baseWithGuarantee + travelHrs + otPremiumValue + spreadPremiumValue);
             }
@@ -154,12 +152,15 @@
             document.getElementById('result').style.display = 'block';
             document.getElementById('total').innerText = `Total Pay: $${grossPay.toFixed(2)}`;
             
+            let xbLine = isXB && xbStepUpValue > 0 ? `XB 1.0x Step-up: ${xbStepUpValue.toFixed(2)} units<br>` : "";
+
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)} hrs<br>` +
                 `Spread Span: ${totalSpanHrs.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
                 `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
-                `Spread Prem (0.5x): ${spreadPremiumValue.toFixed(2)} units ${spreadStatus}<br>` +
+                `Total Spread Pay: ${spreadPremiumValue.toFixed(2)} units<br>` +
+                xbLine +
                 `Travel (Straight): ${travelHrs.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
                 `<strong>Report Time (Flat): ${isolatedReportHrs.toFixed(2)} hrs</strong><br>` +
