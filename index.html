@@ -110,10 +110,23 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            let platformHrs = ((s1_e - s1_s) + ((s2_s !== null) ? (s2_e - s2_s) : 0)) / 60;
+            // Calculate Gap for Intervening Time
+            let interveningHrs = 0;
+            if (s2_s !== null && s1_e !== null) {
+                let gapMins = s2_s - s1_e;
+                if (gapMins > 0 && gapMins < 60) {
+                    interveningHrs = gapMins / 60;
+                }
+            }
+
+            let p1 = s1_e - s1_s;
+            let p2 = (s2_s !== null) ? (s2_e - s2_s) : 0;
+            let platformHrs = (p1 + p2) / 60;
             let reportHrs = (r1 + r2) / 60;
             let travelHrs = travelMins / 60;
-            let workTotal = platformHrs + reportHrs;
+            
+            // Total Work includes Platform + Report + any Gap under 60 mins
+            let workTotal = platformHrs + reportHrs + interveningHrs;
             
             let rawOTOver = Math.max(0, workTotal - 8);
             let otPremiumValue = vtaRound(rawOTOver * 0.5);
@@ -127,10 +140,8 @@
             
             let spreadPremiumValue = 0;
             if (isXB) {
-                // First 30 mins (10.5h to 11h) @ 0.5x
                 let halfTimeWindow = Math.min(rawSpreadOver, 0.5);
                 spreadPremiumValue += vtaRound(halfTimeWindow * 0.5);
-                // After 11h @ 1.0x
                 if (rawSpreadOver > 0.5) {
                     spreadPremiumValue += vtaRound((rawSpreadOver - 0.5) * 1.0);
                 }
@@ -154,6 +165,7 @@
             document.getElementById('audit-details').innerHTML = 
                 `Platform Time: ${platformHrs.toFixed(2)} hrs<br>` +
                 `Report Time: ${reportHrs.toFixed(2)} hrs<br>` +
+                (interveningHrs > 0 ? `Intervening Pay: ${interveningHrs.toFixed(2)} hrs<br>` : "") +
                 `Spread Span: ${adjustedSpan.toFixed(2)} hrs<br>` +
                 `-----------------------<br>` +
                 `OT Prem (0.5x): ${otPremiumValue.toFixed(2)} units<br>` +
