@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pay Auditor</title>
     
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f9; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 420px; margin: auto; }
@@ -110,7 +114,6 @@
                 if (s2_e < s2_s) s2_e += 1440; 
             }
 
-            // Calculate Gap for Intervening Time
             let interveningHrs = 0;
             if (s2_s !== null && s1_e !== null) {
                 let gapMins = s2_s - s1_e;
@@ -125,7 +128,6 @@
             let reportHrs = (r1 + r2) / 60;
             let travelHrs = travelMins / 60;
             
-            // Total Work includes Platform + Report + any Gap under 60 mins
             let workTotal = platformHrs + reportHrs + interveningHrs;
             
             let rawOTOver = Math.max(0, workTotal - 8);
